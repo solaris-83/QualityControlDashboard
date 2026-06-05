@@ -1,5 +1,7 @@
 ﻿
-namespace QualityControl.WPF
+using QualityControl.WPF.Models;
+
+namespace QualityControl.WPF.Services
 {
     public interface IUserService
     {

@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
+using QualityControl.WPF.Messenger;
+using QualityControl.WPF.Services;
 using System.Windows;
 
 namespace QualityControl.WPF
@@ -15,14 +17,11 @@ namespace QualityControl.WPF
            
             Ioc.Default.ConfigureServices(
                 new ServiceCollection()
-               //.AddSingleton<UserViewModel>()
-               .AddSingleton<IWebViewMessenger, WebViewMessenger>()
-               .AddSingleton<IUserService, UserService>()
-               .BuildServiceProvider());
+                    .AddSingleton<IUserService, UserService>()
+                    .AddSingleton<MainWindow>()
+                    .BuildServiceProvider());
 
-            var userService = Ioc.Default.GetService<IUserService>();
-            var mainWindow = new MainWindow(userService);
-            mainWindow.Show();
+            Ioc.Default.GetRequiredService<MainWindow>().Show();
         }
     }
 

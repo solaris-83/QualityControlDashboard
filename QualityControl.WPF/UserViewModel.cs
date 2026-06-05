@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using QualityControl.WPF.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -1,11 +1,11 @@
 ﻿using Microsoft.Web.WebView2.Wpf;
+using QualityControl.WPF.Models;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
-namespace QualityControl.WPF
+namespace QualityControl.WPF.Messenger
 {
-    public class WebViewMessenger(WebView2 webView)
-                : IWebViewMessenger
+    public class WebViewMessenger(WebView2 webView): IWebViewMessenger
     {
         private readonly WebView2 _webView = webView;
 
