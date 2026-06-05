@@ -41,7 +41,7 @@ export function useUserForm() {
         try {
 
             const result =
-                await bus.request<User>(
+                await bus.request<UserDto>(
                     "user.get",
                     { id })
 
