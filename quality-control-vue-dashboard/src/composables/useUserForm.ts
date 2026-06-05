@@ -1,5 +1,5 @@
 import { ref, computed } from "vue"
-import { User } from "../models/user"
+import { UserDto } from "../models/user-dto"
 import { bus } from "../services/webviewMessenger"
 
 export function useUserForm() {
@@ -8,7 +8,7 @@ export function useUserForm() {
 
     const saving = ref(false)
 
-    const user = ref<User>({
+    const user = ref<UserDto>({
         id: 0,
         firstName: "",
         lastName: "",

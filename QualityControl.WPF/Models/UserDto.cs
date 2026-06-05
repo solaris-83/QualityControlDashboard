@@ -1,6 +1,9 @@
 ﻿
+using TypeGen.Core.TypeAnnotations;
+
 namespace QualityControl.WPF.Models
 {
+    [ExportTsClass(OutputDir = "../quality-control-vue-dashboard/src/models")]
     public class UserDto
     {
         public int Id { get; set; }
