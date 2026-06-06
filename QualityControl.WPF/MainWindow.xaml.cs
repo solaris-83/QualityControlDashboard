@@ -1,6 +1,9 @@
-﻿using QualityControl.WPF.Messenger;
+﻿using Microsoft.EntityFrameworkCore;
+using QualityControl.WPF.DB;
+using QualityControl.WPF.Messenger;
 using QualityControl.WPF.Models;
 using QualityControl.WPF.Services;
+using System.IO;
 using System.Windows;
 
 namespace QualityControl.WPF
@@ -12,11 +15,14 @@ namespace QualityControl.WPF
     { 
         private IWebViewMessenger _messenger;
         private readonly IUserService _userService;
-        public MainWindow(IUserService userService)
+        private readonly AppDbContext _context;
+        public MainWindow(IUserService userService, AppDbContext context)
         {
+            _context = context;
             _userService = userService;
             InitializeComponent();
             Loaded += OnLoaded;
+            Console.WriteLine( _context.Model.ToDebugString());
         }
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -34,9 +40,9 @@ namespace QualityControl.WPF
             RegisterHandlers();
 
             Browser.Source = new Uri(@"http://localhost:5173");
-           // var distIndexPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..", "..", "..", "..", "quality-control-vue-dashboard", "dist", "index.html"));
+            var distIndexPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..", "..", "..", "..", "quality-control-vue-dashboard", "dist", "index.html"));
 
-           // Browser.Source = new Uri(distIndexPath);
+             //Browser.Source = new Uri(distIndexPath);
         }
 
         private void RegisterHandlers()
