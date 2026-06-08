@@ -131,7 +131,7 @@ function uploadDefaultFile() {
     const request = new FileRequestDto()
     request.week = 22
     request.year = 2026
-    request.projects = ["BUS_ADAS", "TRUCK_MH24"]
+    request.projects = ["BUS_ADAS", "TRUCK_L24", "TRUCK_MH24"]
 
     uploadFile(request)
 }

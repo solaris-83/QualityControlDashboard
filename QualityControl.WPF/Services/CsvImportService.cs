@@ -1,4 +1,4 @@
-using CsvHelper;
+﻿using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using QualityControl.WPF.DB;
@@ -15,7 +15,7 @@ namespace QualityControl.WPF.Services
     public class CsvImportService(AppDbContext context) : ICsvImportService
     {
         private readonly AppDbContext _context = context;
-        private const int BatchSize = 1000;
+        private const int BatchSize = 5000;
 
         public async Task<ImportResult> ImportCsvAsync(string filePath, IProgress<ImportProgress>? progress = null, CancellationToken cancellationToken = default)
         {
@@ -24,11 +24,10 @@ namespace QualityControl.WPF.Services
                 StartTime = DateTime.Now
             };
 
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
             try
             {
-                // Use explicit transaction for complete rollback on failure
-                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-           
                 if (!System.IO.File.Exists(filePath))
                 {
                     result.Success = false;
@@ -37,75 +36,95 @@ namespace QualityControl.WPF.Services
                     return result;
                 }
 
-                // Create file record within transaction
-                var fileRecord = await CreateFileRecordAsync(filePath, cancellationToken);
-               
-                // Load lookup tables into memory for fast access
-                var lookupCache = await LoadLookupCacheAsync(cancellationToken);
-
-                // Configure CsvHelper
-                var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-                {
-                    Delimiter = ";",
-                    HasHeaderRecord = true,
-                    MissingFieldFound = null,
-                    BadDataFound = null,
-                    TrimOptions = TrimOptions.Trim
-                };
-
-                using var reader = new StreamReader(filePath);
-                using var csv = new CsvReader(reader, config);
-
-                var records = csv.GetRecords<DataSetCsvRecord>();
-                var batch = new List<DataSet>(BatchSize);
-                int recordCount = 0;
-                int importedCount = 0;
-                int skippedCount = 0;
+                result.FullName = filePath;
 
                 progress?.Report(new ImportProgress
                 {
                     CurrentRecord = 0,
-                    TotalRecords = records.Count(),
+                    TotalRecords = 0,
                     CurrentStatus = "Reading CSV file..."
                 });
 
-                foreach (var record in records)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
+                // Create file record
+                var fileRecord = await CreateFileRecordAsync(filePath, cancellationToken);
 
+                // Use streaming enumerable for records
+                var allRecords = ReadAllCsvRecordsAsync(filePath, cancellationToken);
+
+                progress?.Report(new ImportProgress
+                {
+                    CurrentRecord = 0,
+                    TotalRecords = 0,
+                    CurrentStatus = "Preparing lookup tables..."
+                });
+
+                // Bulk insert/update all lookup tables FIRST (streaming)
+                await BulkUpsertLookupTablesAsync(allRecords, cancellationToken);
+
+                var projects = await _context.Projects.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
+                var projectName = fileRecord.Name.Substring(10, fileRecord.Name.Length - 14);
+                if (projects.TryGetValue(projectName, out int value))
+                {
+                    fileRecord.Project_Id = value;
+                }
+                else
+                {
+                    fileRecord.Project = new Project { Name = projectName };
+                }
+
+                _context.Files.Add(fileRecord);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                progress?.Report(new ImportProgress
+                {
+                    CurrentRecord = 0,
+                    TotalRecords = 0,
+                    CurrentStatus = "Loading lookup cache..."
+                });
+
+                // Load lookup cache after bulk insert
+                var lookupCache = await LoadLookupCacheAsync(cancellationToken);
+
+                progress?.Report(new ImportProgress
+                {
+                    CurrentRecord = 0,
+                    TotalRecords = 0,
+                    CurrentStatus = "Processing and inserting records..."
+                });
+
+                // Process records in streaming fashion
+                var batch = new List<DataSet>(BatchSize);
+                int recordCount = 0;
+                int importedCount = 0;
+
+                await foreach (var record in ReadAllCsvRecordsAsync(filePath, cancellationToken))
+                {
                     recordCount++;
 
-                    try
-                    {
-                        var dataSet = await MapToDataSetAsync(record, fileRecord, lookupCache, cancellationToken);
-                        batch.Add(dataSet);
+                    var dataSet = MapToDataSet(record, fileRecord, lookupCache);
+                    batch.Add(dataSet);
 
-                        if (batch.Count >= BatchSize)
+                    if (batch.Count >= BatchSize)
+                    {
+                        _context.DataSets.AddRange(batch);
+                        await _context.SaveChangesAsync(cancellationToken);
+                        importedCount += batch.Count;
+                        batch.Clear();
+
+                        progress?.Report(new ImportProgress
                         {
-                            await SaveBatchAsync(batch, cancellationToken);
-                            importedCount += batch.Count;
-                            batch.Clear();
-
-                            progress?.Report(new ImportProgress
-                            {
-                                CurrentRecord = recordCount,
-                                TotalRecords = records.Count(),
-                                CurrentStatus = $"Imported {importedCount} records..."
-                            });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // Critical: if any record fails, rollback entire transaction
-                        throw new InvalidOperationException(
-                            $"Failed to process record {recordCount}. Import aborted to maintain data integrity.", ex);
+                            CurrentRecord = importedCount,
+                            TotalRecords = 0,
+                            CurrentStatus = $"Inserted {importedCount} records..."
+                        });
                     }
                 }
 
                 // Save remaining batch
                 if (batch.Count > 0)
                 {
-                    await SaveBatchAsync(batch, cancellationToken);
+                    _context.DataSets.AddRange(batch);
+                    await _context.SaveChangesAsync(cancellationToken);
                     importedCount += batch.Count;
                 }
 
@@ -113,40 +132,41 @@ namespace QualityControl.WPF.Services
                 fileRecord.EndImportAt = DateTime.Now;
                 await _context.SaveChangesAsync(cancellationToken);
 
-                // Commit transaction only if everything succeeded
+                // Commit transaction
                 await transaction.CommitAsync(cancellationToken);
 
                 result.Success = true;
                 result.TotalRecordsProcessed = recordCount;
                 result.RecordsImported = importedCount;
-                result.RecordsSkipped = skippedCount;
+                result.RecordsSkipped = 0;
 
                 progress?.Report(new ImportProgress
                 {
-                    CurrentRecord = recordCount,
+                    CurrentRecord = importedCount,
                     TotalRecords = recordCount,
                     CurrentStatus = "Import completed successfully!"
                 });
             }
             catch (OperationCanceledException)
             {
-                // Transaction will auto-rollback on dispose
                 result.Success = false;
                 result.ErrorMessage = "Import was cancelled by user.";
+                await transaction.RollbackAsync(cancellationToken);
             }
-            catch(FileAlreadyImportedException faie)
+            catch (FileAlreadyImportedException faie)
             {
                 result.RecordsImported = 0;
                 result.RecordsSkipped = 0;
                 result.TotalRecordsProcessed = 0;
                 result.Success = true;
                 result.ErrorMessage = faie.Message;
+                await transaction.RollbackAsync(cancellationToken);
             }
             catch (Exception ex)
             {
-                // Transaction will auto-rollback on dispose
                 result.Success = false;
-                result.ErrorMessage = ex.InnerException == null? ex.Message : ex.InnerException.Message;
+                result.ErrorMessage = ex.InnerException?.Message ?? ex.Message;
+                await transaction.RollbackAsync(cancellationToken);
             }
             finally
             {
@@ -154,6 +174,83 @@ namespace QualityControl.WPF.Services
             }
 
             return result;
+        }
+
+        private async IAsyncEnumerable<DataSetCsvRecord> ReadAllCsvRecordsAsync(string filePath, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                Delimiter = ";",
+                HasHeaderRecord = true,
+                MissingFieldFound = null,
+                BadDataFound = null,
+                TrimOptions = TrimOptions.Trim
+            };
+
+            using var reader = new StreamReader(filePath);
+            using var csv = new CsvReader(reader, config);
+
+            await foreach (var record in csv.GetRecordsAsync<DataSetCsvRecord>(cancellationToken))
+            {
+                yield return record;
+            }
+        }
+
+        private async Task BulkUpsertLookupTablesAsync(IAsyncEnumerable<DataSetCsvRecord> records, CancellationToken cancellationToken)
+        {
+            // Collect unique values while streaming
+            var uniqueLicenses = new HashSet<string>();
+            var uniqueVins = new HashSet<string>();
+            var uniqueProjects = new HashSet<string>();
+            var uniqueModels = new HashSet<string>();
+            var uniqueReportTypes = new HashSet<string>();
+            var uniqueCategories = new HashSet<string>();
+            var uniqueOperationCodes = new HashSet<string>();
+            var uniqueResultTypes = new HashSet<string>();
+
+            await foreach (var record in records.WithCancellation(cancellationToken))
+            {
+                uniqueLicenses.Add(record.License);
+                uniqueVins.Add(record.VIN);
+                uniqueProjects.Add(record.Model.Split(".")[0]);
+                uniqueModels.Add(record.Model);
+                uniqueReportTypes.Add(record.ReportType);
+                uniqueCategories.Add(record.Category);
+                uniqueOperationCodes.Add(record.OperationCode);
+                uniqueResultTypes.Add(record.ResultType);
+            }
+
+            // Load existing values
+            var existingLicenses = await _context.Licenses.Select(x => x.Name).ToHashSetAsync(cancellationToken);
+            var existingVins = await _context.VINs.Select(x => x.Code).ToHashSetAsync(cancellationToken);
+            var existingProjects = await _context.Projects.Select(x => x.Name).ToHashSetAsync(cancellationToken);
+            var existingModels = await _context.Models.Select(x => x.Name).ToHashSetAsync(cancellationToken);
+            var existingReportTypes = await _context.ReportTypes.Select(x => x.Name).ToHashSetAsync(cancellationToken);
+            var existingCategories = await _context.Categories.Select(x => x.Name).ToHashSetAsync(cancellationToken);
+            var existingOperationCodes = await _context.OperationCodes.Select(x => x.Name).ToHashSetAsync(cancellationToken);
+            var existingResultTypes = await _context.ResultTypes.Select(x => x.Name).ToHashSetAsync(cancellationToken);
+
+            // Insert only new values
+            var newLicenses = uniqueLicenses.Where(x => !existingLicenses.Contains(x)).Select(x => new License { Name = x }).ToList();
+            var newVins = uniqueVins.Where(x => !existingVins.Contains(x)).Select(x => new VIN { Code = x }).ToList();
+            var newProjects = uniqueProjects.Where(x => !existingProjects.Contains(x)).Select(x => new Project { Name = x }).ToList();
+            var newModels = uniqueModels.Where(x => !existingModels.Contains(x)).Select(x => new Model { Name = x }).ToList();
+            var newReportTypes = uniqueReportTypes.Where(x => !existingReportTypes.Contains(x)).Select(x => new ReportType { Name = x }).ToList();
+            var newCategories = uniqueCategories.Where(x => !existingCategories.Contains(x)).Select(x => new Category { Name = x }).ToList();
+            var newOperationCodes = uniqueOperationCodes.Where(x => !existingOperationCodes.Contains(x)).Select(x => new OperationCode { Name = x }).ToList();
+            var newResultTypes = uniqueResultTypes.Where(x => !existingResultTypes.Contains(x)).Select(x => new ResultType { Name = x }).ToList();
+
+            // Bulk insert new lookup values
+            if (newCategories.Count > 0) _context.Categories.AddRange(newCategories);
+            if (newLicenses.Count > 0) _context.Licenses.AddRange(newLicenses);
+            if (newVins.Count > 0) _context.VINs.AddRange(newVins);
+            if (newProjects.Count > 0) _context.Projects.AddRange(newProjects);
+            if (newModels.Count > 0) _context.Models.AddRange(newModels);
+            if (newReportTypes.Count > 0) _context.ReportTypes.AddRange(newReportTypes);
+            if (newOperationCodes.Count > 0) _context.OperationCodes.AddRange(newOperationCodes);
+            if (newResultTypes.Count > 0) _context.ResultTypes.AddRange(newResultTypes);
+           
+            await _context.SaveChangesAsync(cancellationToken);
         }
 
         private static string GetFileHash(string filePath, HashAlgorithm algorithm)
@@ -173,36 +270,37 @@ namespace QualityControl.WPF.Services
             short week = Convert.ToInt16(fileName.Substring(2, 2));
             int year = Convert.ToInt32(fileName.Substring(5, 4));
             string projectName = fileName.Substring(10, fileName.Length - 14);
-            // Check if file already has a successful import
-            var existingFile = await _context.Files.FirstOrDefaultAsync(f => f.Name == fileName && f.Hash == hash /*&& f.EndImportAt != null*/, cancellationToken);
+
+            var existingFile = await _context.Files
+                .FirstOrDefaultAsync(f => f.Name == fileName && f.Hash == hash, cancellationToken);
 
             if (existingFile != null)
             {
-                throw new FileAlreadyImportedException($"File '{fileName}' has already been imported successfully. " +
-                      "To re-import, please delete the existing file record first.");
+                throw new FileAlreadyImportedException(
+                    $"File '{fileName}' has already been imported successfully. " +
+                    "To re-import, please delete the existing file record first.");
             }
-            
-            // Create new file record
+
             var fileRecord = new File
             {
                 Name = fileName,
-                StartImportAt = DateTime.Now, 
-                Hash = hash, 
+                StartImportAt = DateTime.Now,
+                Hash = hash,
                 Week = week,
-                Year = year, 
+                Year = year,
             };
-            var projects = await _context.Projects.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
-            if (projects.TryGetValue(projectName, out int value))
-            {
-                fileRecord.Project_Id = value;
-            }
-            else
-            {
-                fileRecord.Project = new Project { Name = projectName };
-            }
 
-            _context.Files.Add(fileRecord);
-            await _context.SaveChangesAsync(cancellationToken);
+            //var projects = await _context.Projects.AsNoTracking()
+            //    .ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
+
+            //if (projects.TryGetValue(projectName, out int value))
+            //{
+            //    fileRecord.Project_Id = value;
+            //}
+            //else
+            //{
+            //    fileRecord.Project = new Project { Name = projectName };
+            //}
 
             return fileRecord;
         }
@@ -211,41 +309,29 @@ namespace QualityControl.WPF.Services
         {
             return new LookupCache
             {
-                Licenses = await _context.Licenses.ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
-                VINs = await _context.VINs.ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken),
-                Projects = await _context.Projects.ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
-                Models = await _context.Models.ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
-                ReportTypes = await _context.ReportTypes.ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
-                Categories = await _context.Categories.ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
-                OperationCodes = await _context.OperationCodes.ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
-                ResultTypes = await _context.ResultTypes.ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken)
+                Licenses = await _context.Licenses.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
+                VINs = await _context.VINs.AsNoTracking().ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken),
+                Projects = await _context.Projects.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
+                Models = await _context.Models.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
+                ReportTypes = await _context.ReportTypes.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
+                Categories = await _context.Categories.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
+                OperationCodes = await _context.OperationCodes.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken),
+                ResultTypes = await _context.ResultTypes.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken)
             };
         }
 
-        private async Task<DataSet> MapToDataSetAsync(
-            DataSetCsvRecord record,
-            File fileRecord,
-            LookupCache cache,
-            CancellationToken cancellationToken)
+        private DataSet MapToDataSet(DataSetCsvRecord record, File fileRecord, LookupCache cache)
         {
             return new DataSet
             {
-                License_Id = await GetOrCreateLookupIdAsync(record.License, cache.Licenses, 
-                    () => new DB.Models.License { Name = record.License }, cancellationToken),
-                VIN_Id = await GetOrCreateLookupIdAsync(record.VIN, cache.VINs, 
-                    () => new VIN { Code = record.VIN }, cancellationToken),
-                Model_Id = await GetOrCreateLookupIdAsync(record.Model, cache.Models, 
-                    () => new Model { Name = record.Model }, cancellationToken),
-                ReportType_Id = await GetOrCreateLookupIdAsync(record.ReportType, cache.ReportTypes, 
-                    () => new ReportType { Name = record.ReportType }, cancellationToken),
-                Category_Id = await GetOrCreateLookupIdAsync(record.Category, cache.Categories, 
-                    () => new Category { Name = record.Category }, cancellationToken),
-                OperationCode_Id = await GetOrCreateLookupIdAsync(record.OperationCode, cache.OperationCodes, 
-                    () => new OperationCode { Name = record.OperationCode }, cancellationToken),
-                ResultType_Id = await GetOrCreateLookupIdAsync(record.ResultType, cache.ResultTypes, 
-                    () => new ResultType { Name = record.ResultType }, cancellationToken),
-                Project_Id = await GetOrCreateLookupIdAsync(record.Model.Split(".")[0], cache.Projects, 
-                    () => new Project { Name = record.Model.Split(".")[0] }, cancellationToken),
+                License_Id = cache.Licenses[record.License],
+                VIN_Id = cache.VINs[record.VIN],
+                Model_Id = cache.Models[record.Model],
+                ReportType_Id = cache.ReportTypes[record.ReportType],
+                Category_Id = cache.Categories[record.Category],
+                OperationCode_Id = cache.OperationCodes[record.OperationCode],
+                ResultType_Id = cache.ResultTypes[record.ResultType],
+                Project_Id = cache.Projects[record.Model.Split(".")[0]],
                 File_Id = fileRecord.Id,
                 UTC_DateTime = record.UTC_DateTime,
                 ElapsedTime = record.ElapsedTime,
@@ -256,49 +342,6 @@ namespace QualityControl.WPF.Services
                 AdditionalInfo = record.AdditionalInfo,
                 AffectedControllers = record.AffectedControllers
             };
-        }
-
-        private async Task<int> GetOrCreateLookupIdAsync<T>(
-            string key,
-            Dictionary<string, int> cache,
-            Func<T> createEntity,
-            CancellationToken cancellationToken) where T : class
-        {
-            if (cache.TryGetValue(key, out var id))
-            {
-                return id;
-            }
-
-            // Create new entity within the same transaction
-            var entity = createEntity();
-            _context.Set<T>().Add(entity);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            // Get the ID using reflection
-            id = (int)entity.GetType().GetProperty("Id")!.GetValue(entity)!;
-            cache[key] = id;
-
-            return id;
-        }
-
-        private TimeSpan? ParseElapsedTime(string? elapsedTime)
-        {
-            if (string.IsNullOrWhiteSpace(elapsedTime))
-                return null;
-
-            if (TimeSpan.TryParse(elapsedTime, out var result))
-                return result;
-
-            if (double.TryParse(elapsedTime, out var seconds))
-                return TimeSpan.FromSeconds(seconds);
-
-            return null;
-        }
-
-        private async Task SaveBatchAsync(List<DataSet> batch, CancellationToken cancellationToken)
-        {
-            _context.DataSets.AddRange(batch);
-            await _context.SaveChangesAsync(cancellationToken);
         }
 
         private class LookupCache
