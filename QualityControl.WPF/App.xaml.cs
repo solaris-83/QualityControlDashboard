@@ -1,7 +1,5 @@
-﻿using CommunityToolkit.Mvvm.DependencyInjection;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using QualityControl.WPF.DB;
 using QualityControl.WPF.Messenger;
 using QualityControl.WPF.Services;
@@ -10,30 +8,77 @@ using System.Windows;
 
 namespace QualityControl.WPF
 {
-    /// <summary>
-    /// Interaction logic for App.xaml
-    /// </summary>
     public partial class App : Application
     {
+        private ServiceProvider? _serviceProvider;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-            var folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Path.Combine(Environment.GetFolderPath(folder), "QualityControl");
-            Directory.CreateDirectory(path);
-            var connectionString = Path.Join(path, "qualitycontrol.db");
 
-            Ioc.Default.ConfigureServices(
-                new ServiceCollection()
-                    .AddSingleton<IUserService, UserService>()
-                    //.AddSingleton<IWebViewMessenger>(p => p.GetService<MainWindow>()!.Browser != null ? new WebViewMessenger(p.GetService<MainWindow>()!.Browser) : throw new InvalidOperationException("MainWindow or Browser is not available"))
-                    .AddDbContext<AppDbContext>(options =>
-                        options.UseSqlite(connectionString))
-                    .AddSingleton<MainWindow>()
-                    .BuildServiceProvider());
+            var serviceCollection = new ServiceCollection();
+            ConfigureServices(serviceCollection);
+            _serviceProvider = serviceCollection.BuildServiceProvider();
 
-            Ioc.Default.GetRequiredService<MainWindow>().Show();
+            // Ensure database is created and migrations are applied
+            EnsureDatabaseCreated();
+
+            var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+            mainWindow.Show();
+        }
+
+        // Marked as static since it doesn't rely on instance state and is only called once during startup
+        private static void ConfigureServices(IServiceCollection services)
+        {
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var dbPath = Path.Combine(appDataPath, "QualityControl", "qualitycontrol.db");
+
+            // Ensure directory exists
+            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+            // Database
+            services.AddDbContext<AppDbContext>(options =>
+                options.UseSqlite($"Data Source={dbPath}"));
+
+            // Services
+            services.AddScoped<IUserService, UserService>();
+            services.AddScoped<ICsvImportService, CsvImportService>();
+            
+            // Messenger - Scoped so each MainWindow instance gets its own messenger
+            services.AddScoped<IWebViewMessenger, WebViewMessenger>();
+
+            // Windows
+            services.AddTransient<MainWindow>();
+        }
+
+        private void EnsureDatabaseCreated()
+        {
+            try
+            {
+                using var scope = _serviceProvider!.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                // Apply any pending migrations (creates DB if it doesn't exist)
+                context.Database.Migrate();
+
+                // Alternative: Just create DB without migrations
+                // context.Database.EnsureCreated();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to initialize database: {ex.Message}",
+                    "Database Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                Shutdown();
+            }
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            _serviceProvider?.Dispose();
+            base.OnExit(e);
         }
     }
-
 }

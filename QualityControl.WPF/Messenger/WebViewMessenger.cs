@@ -1,25 +1,30 @@
 ﻿using Microsoft.Web.WebView2.Wpf;
 using QualityControl.WPF.Models;
+using System;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace QualityControl.WPF.Messenger
 {
-    public class WebViewMessenger(WebView2 webView): IWebViewMessenger
+    public class WebViewMessenger : IWebViewMessenger
     {
-        private readonly WebView2 _webView = webView;
+        private WebView2? _webView;
 
         private readonly JsonSerializerOptions _options =
             new()
             {
-                PropertyNamingPolicy =
-                    JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
 
         private readonly ConcurrentDictionary<
             string,
             Func<object?, Task<object?>>>
             _handlers = new();
+
+        public void Initialize(WebView2 webView)
+        {
+            _webView = webView ?? throw new ArgumentNullException(nameof(webView));
+        }
 
         public void RegisterHandler<
             TRequest,
@@ -41,6 +46,12 @@ namespace QualityControl.WPF.Messenger
         public async Task ReceiveMessageAsync(
             string json)
         {
+            if (_webView?.CoreWebView2 == null)
+            {
+                throw new InvalidOperationException(
+                    "WebViewMessenger must be initialized with a WebView2 instance before receiving messages.");
+            }
+
             var message =
                 JsonSerializer.Deserialize<WebMessage>(
                     json,
@@ -59,6 +70,7 @@ namespace QualityControl.WPF.Messenger
             var response =
                 await handler(message.Payload);
 
+            Publish(true, response, "", message.Id);
             var responseMessage =
                 new WebMessage
                 {
@@ -73,6 +85,26 @@ namespace QualityControl.WPF.Messenger
                     _options);
 
             _webView.CoreWebView2
+                .PostWebMessageAsJson(
+                    responseJson);
+        }
+
+        public void Publish(bool isResponse, object? payload, string type = "", string? correlationId = null)
+        {
+            var webMessage = new WebMessage
+            {
+                IsResponse = isResponse,
+                CorrelationId = correlationId,
+                Type = type,
+                Payload = payload
+            };
+
+            var responseJson =
+                JsonSerializer.Serialize(
+                    webMessage,
+                    _options);
+
+            _webView!.CoreWebView2
                 .PostWebMessageAsJson(
                     responseJson);
         }

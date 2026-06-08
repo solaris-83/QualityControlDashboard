@@ -21,6 +21,20 @@ namespace QualityControl.WPF.DB
         {
         }
 
+        // Design-time constructor for EF Core tools
+        public AppDbContext() : base()
+        {
+        }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            // Only configure if not already configured (for design-time support)
+            if (!optionsBuilder.IsConfigured)
+            {
+                optionsBuilder.UseSqlite("Data Source=qualitycontrol.db");
+            }
+        }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -38,7 +52,7 @@ namespace QualityControl.WPF.DB
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<File>()
-                .HasIndex(f => new { f.Week, f.Year, f.Project_Id })
+                .HasIndex(f => new { f.Name, f.Hash })
                 .IsUnique();
 
             // Configure unique indexes for lookup tables
@@ -94,12 +108,6 @@ namespace QualityControl.WPF.DB
                 .WithMany(m => m.DataSets)
                 .HasForeignKey(d => d.Model_Id)
                 .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<DataSet>()
-               .HasOne(d => d.Project)
-               .WithMany(p => p.DataSets)
-               .HasForeignKey(d => d.Project_Id)
-               .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<DataSet>()
                 .HasOne(d => d.ReportType)

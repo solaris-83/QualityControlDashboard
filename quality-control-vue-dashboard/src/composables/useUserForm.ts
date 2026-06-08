@@ -1,6 +1,7 @@
 import { ref, computed } from "vue"
 import { UserDto } from "../models/user-dto"
 import { bus } from "../services/webviewMessenger"
+import { FileRequestDto } from "../models/file-request-dto"
 
 export function useUserForm() {
 
@@ -74,6 +75,25 @@ export function useUserForm() {
         }
     }
 
+    async function uploadFile(fileRequest: FileRequestDto) {
+
+      
+        loading.value = true
+
+        try {
+
+            const result = await bus.request<FileRequestDto>(
+                "csv.upload",
+               fileRequest , 1800000)
+
+            console.log("Upload result:", result)
+        }
+        finally {
+
+            loading.value = false
+        }
+    }
+
     function clear() {
 
         user.value = {
@@ -93,6 +113,7 @@ export function useUserForm() {
         isValid,
         loadUser,
         saveUser,
+        uploadFile,
         clear
     }
 }

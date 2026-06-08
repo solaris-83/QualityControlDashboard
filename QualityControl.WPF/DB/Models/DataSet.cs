@@ -50,16 +50,17 @@ namespace QualityControl.WPF.DB.Models
         // Data properties
         public DateTime UTC_DateTime { get; set; }
 
-        public TimeSpan? ElapsedTime { get; set; }
+        [MaxLength(4)]
+        public string? ElapsedTime { get; set; }
 
-        [MaxLength(50)]
+        [MaxLength(100)]
         public string? BCAVersion { get; set; }
 
         [MaxLength(100)]
         public string? AppName { get; set; }
 
-        [MaxLength(50)]
-        public string? WUVersion { get; set; }
+        [MaxLength(100)]
+        public string WUVersion { get; set; }
 
         [MaxLength(50)]
         public string? ErrorCode { get; set; }

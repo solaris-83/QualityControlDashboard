@@ -4,6 +4,10 @@ namespace QualityControl.WPF.Services
 {
     public class UserService : IUserService
     {
+        public UserService()
+        {
+            
+        }
         public Task<UserDto> GetUserAsync(int id)
         {
             return Task.FromResult(new UserDto

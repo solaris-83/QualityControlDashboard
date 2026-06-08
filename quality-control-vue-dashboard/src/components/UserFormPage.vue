@@ -93,7 +93,12 @@
 
                 Clear
             </button>
+            <button
+                @click="uploadDefaultFile()"
+                :disabled="loading">
 
+                Upload
+            </button>
         </div>
 
     </div>
@@ -106,6 +111,7 @@
 
 import { useUserForm }
 from "../composables/useUserForm"
+import { FileRequestDto } from "../models/file-request-dto";
 
 const {
     user,
@@ -114,10 +120,21 @@ const {
     errors,
     loadUser,
     saveUser,
+    uploadFile,
     clear
 }
 =
 useUserForm()
+
+function uploadDefaultFile() {
+
+    const request = new FileRequestDto()
+    request.week = 22
+    request.year = 2026
+    request.projects = ["BUS_ADAS", "TRUCK_MH24"]
+
+    uploadFile(request)
+}
 
 </script>
 

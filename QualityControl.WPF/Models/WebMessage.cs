@@ -10,8 +10,7 @@ namespace QualityControl.WPF.Models
             = Guid.NewGuid().ToString();
 
         [JsonPropertyName("type")]
-        public string Type { get; set; }
-            = "";
+        public string Type { get; set; } = "";
 
         [JsonPropertyName("payload")]
         public object? Payload { get; set; }

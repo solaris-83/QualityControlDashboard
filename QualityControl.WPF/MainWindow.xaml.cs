@@ -3,7 +3,10 @@ using QualityControl.WPF.DB;
 using QualityControl.WPF.Messenger;
 using QualityControl.WPF.Models;
 using QualityControl.WPF.Services;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows;
 
 namespace QualityControl.WPF
@@ -13,53 +16,93 @@ namespace QualityControl.WPF
     /// </summary>
     public partial class MainWindow : Window
     { 
-        private IWebViewMessenger _messenger;
+        private readonly IWebViewMessenger _messenger;
         private readonly IUserService _userService;
+        private readonly ICsvImportService _csvImportService;
         private readonly AppDbContext _context;
-        public MainWindow(IUserService userService, AppDbContext context)
+
+        public MainWindow(
+            IUserService userService, 
+            AppDbContext context,
+            IWebViewMessenger messenger, 
+            ICsvImportService csvImportService)
         {
             _context = context;
             _userService = userService;
+            _messenger = messenger;
+            _csvImportService = csvImportService;
+            
             InitializeComponent();
             Loaded += OnLoaded;
-            Console.WriteLine( _context.Model.ToDebugString());
+            
+            Console.WriteLine(_context.Model.ToDebugString());
         }
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
             await Browser.EnsureCoreWebView2Async();
 
-            _messenger = new WebViewMessenger(Browser);
+            // Initialize the messenger with the WebView2 control
+            _messenger.Initialize(Browser);
 
-            Browser.CoreWebView2.WebMessageReceived +=
-                async (_, args) =>
-                {
-                    await _messenger.ReceiveMessageAsync(args.WebMessageAsJson);
-                };
+            // Register the WebMessageReceived event
+            Browser.CoreWebView2.WebMessageReceived += async (_, args) =>
+            {
+                await _messenger.ReceiveMessageAsync(args.WebMessageAsJson);
+            };
 
+            // Register message handlers
             RegisterHandlers();
 
+            // Navigate to the web application
             Browser.Source = new Uri(@"http://localhost:5173");
-            var distIndexPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..", "..", "..", "..", "quality-control-vue-dashboard", "dist", "index.html"));
-
-             //Browser.Source = new Uri(distIndexPath);
+            
+            // Alternative: load from dist folder
+            // var distIndexPath = Path.GetFullPath(Path.Combine(
+            //     AppContext.BaseDirectory, "..", "..", "..", "..", 
+            //     "quality-control-vue-dashboard", "dist", "index.html"));
+            // Browser.Source = new Uri(distIndexPath);
         }
 
         private void RegisterHandlers()
         {
-            _messenger!
-                .RegisterHandler<UserRequest, UserDto>("user.get", async request =>
-                            {
-                                return await _userService.GetUserAsync(request!.Id);
-                            });
+            _messenger.RegisterHandler<UserRequest, UserDto>(
+                "user.get", 
+                async request =>
+                {
+                    return await _userService.GetUserAsync(request!.Id);
+                });
 
-            _messenger!
-                .RegisterHandler<UserDto, bool>("user.save",async user =>
+            _messenger.RegisterHandler<UserDto, bool>(
+                "user.save", 
+                async user =>
+                {
+                    await _userService.SaveUserAsync(user!);
+                    return true;
+                });
+
+            _messenger.RegisterHandler<FileRequestDto, List<ImportResult>>(
+                "csv.upload", 
+                async request =>
+                {
+                    List<ImportResult> importResults = [];
+                    using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(1800));
+                    //ct.CancelAfter(TimeSpan.FromSeconds(30));
+                    ct.Token.ThrowIfCancellationRequested(); // TODO set catch exception
+
+                    ImportResult importResult = null;
+                    DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $"QualityControl\\{request.Year}\\wk{request.Week}"));
+                    
+                    foreach (var file in directoryInfo.GetFiles().Where(f => request.Projects.Any(project => f.Name.Contains(project))))
                     {
-                        await _userService.SaveUserAsync(user!);
-
-                        return true;
-                    });
+                        if (!ct.IsCancellationRequested)
+                        {
+                            importResult = await _csvImportService.ImportCsvAsync(file.FullName, null, ct.Token);
+                            importResults.Add(importResult);
+                        }
+                    }
+                    return importResults;
+                });
         }
     }
 }
