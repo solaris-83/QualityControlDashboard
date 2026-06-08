@@ -16,10 +16,7 @@ namespace QualityControl.WPF.Messenger
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
 
-        private readonly ConcurrentDictionary<
-            string,
-            Func<object?, Task<object?>>>
-            _handlers = new();
+        private readonly ConcurrentDictionary<string, Func<object?, Task<object?>>> _handlers = new();
 
         public void Initialize(WebView2 webView)
         {
@@ -35,16 +32,13 @@ namespace QualityControl.WPF.Messenger
             _handlers[messageType] =
                 async payload =>
                 {
-                    var request =
-                        Deserialize<TRequest>(
-                            payload);
+                    var request = Deserialize<TRequest>(payload);
 
                     return await handler(request);
                 };
         }
 
-        public async Task ReceiveMessageAsync(
-            string json)
+        public async Task ReceiveMessageAsync(string json)
         {
             if (_webView?.CoreWebView2 == null)
             {
@@ -52,23 +46,15 @@ namespace QualityControl.WPF.Messenger
                     "WebViewMessenger must be initialized with a WebView2 instance before receiving messages.");
             }
 
-            var message =
-                JsonSerializer.Deserialize<WebMessage>(
-                    json,
-                    _options);
+            var message = JsonSerializer.Deserialize<WebMessage>(json, _options);
 
             if (message == null)
                 return;
 
-            if (!_handlers.TryGetValue(
-                    message.Type,
-                    out var handler))
-            {
+            if (!_handlers.TryGetValue(message.Type, out var handler))
                 return;
-            }
 
-            var response =
-                await handler(message.Payload);
+            var response = await handler(message.Payload);
 
             Publish(true, response, "", message.Id);
             var responseMessage =
@@ -79,14 +65,9 @@ namespace QualityControl.WPF.Messenger
                     Payload = response
                 };
 
-            var responseJson =
-                JsonSerializer.Serialize(
-                    responseMessage,
-                    _options);
+            var responseJson = JsonSerializer.Serialize(responseMessage, _options);
 
-            _webView.CoreWebView2
-                .PostWebMessageAsJson(
-                    responseJson);
+            _webView.CoreWebView2.PostWebMessageAsJson(responseJson);
         }
 
         public void Publish(bool isResponse, object? payload, string type = "", string? correlationId = null)
@@ -99,23 +80,16 @@ namespace QualityControl.WPF.Messenger
                 Payload = payload
             };
 
-            var responseJson =
-                JsonSerializer.Serialize(
-                    webMessage,
-                    _options);
+            var responseJson = JsonSerializer.Serialize(webMessage, _options);
 
-            _webView!.CoreWebView2
-                .PostWebMessageAsJson(
-                    responseJson);
+            _webView!.CoreWebView2.PostWebMessageAsJson(responseJson);
         }
 
-        private T? Deserialize<T>(
-            object? payload)
+        private T? Deserialize<T>(object? payload)
         {
             if (payload is JsonElement element)
             {
-                return element.Deserialize<T>(
-                    _options);
+                return element.Deserialize<T>(_options);
             }
 
             return default;

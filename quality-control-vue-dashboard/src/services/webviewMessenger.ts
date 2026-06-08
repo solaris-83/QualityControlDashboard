@@ -66,6 +66,8 @@ class WebViewMessenger {
         if (!message.isResponse)
             return
 
+        console.log("Received response:", message.payload)
+
         const pending =
             this.pending.get(message.correlationId)
 

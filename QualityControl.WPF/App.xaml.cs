@@ -41,7 +41,7 @@ namespace QualityControl.WPF
 
             // Services
             services.AddScoped<IUserService, UserService>();
-            services.AddScoped<ICsvImportService, CsvImportService>();
+            services.AddTransient<ICsvImportService, CsvImportService>();
             
             // Messenger - Scoped so each MainWindow instance gets its own messenger
             services.AddScoped<IWebViewMessenger, WebViewMessenger>();

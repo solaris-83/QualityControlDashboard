@@ -40,6 +40,7 @@ namespace QualityControl.WPF.Services
 
                 progress?.Report(new ImportProgress
                 {
+                    FileName =Path.GetFileName(filePath),
                     CurrentRecord = 0,
                     TotalRecords = 0,
                     CurrentStatus = "Reading CSV file..."
@@ -48,18 +49,16 @@ namespace QualityControl.WPF.Services
                 // Create file record
                 var fileRecord = await CreateFileRecordAsync(filePath, cancellationToken);
 
-                // Use streaming enumerable for records
-                var allRecords = ReadAllCsvRecordsAsync(filePath, cancellationToken);
-
                 progress?.Report(new ImportProgress
                 {
+                    FileName = Path.GetFileName(filePath),
                     CurrentRecord = 0,
                     TotalRecords = 0,
                     CurrentStatus = "Preparing lookup tables..."
                 });
 
-                // Bulk insert/update all lookup tables FIRST (streaming)
-                await BulkUpsertLookupTablesAsync(allRecords, cancellationToken);
+                // First pass: Bulk insert/update all lookup tables
+                await BulkUpsertLookupTablesAsync(filePath, cancellationToken);
 
                 var projects = await _context.Projects.AsNoTracking().ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
                 var projectName = fileRecord.Name.Substring(10, fileRecord.Name.Length - 14);
@@ -77,6 +76,7 @@ namespace QualityControl.WPF.Services
 
                 progress?.Report(new ImportProgress
                 {
+                    FileName = Path.GetFileName(filePath),
                     CurrentRecord = 0,
                     TotalRecords = 0,
                     CurrentStatus = "Loading lookup cache..."
@@ -87,45 +87,56 @@ namespace QualityControl.WPF.Services
 
                 progress?.Report(new ImportProgress
                 {
+                    FileName = Path.GetFileName(filePath),
                     CurrentRecord = 0,
                     TotalRecords = 0,
                     CurrentStatus = "Processing and inserting records..."
                 });
 
-                // Process records in streaming fashion
-                var batch = new List<DataSet>(BatchSize);
+                // Second pass: Process and insert data records
                 int recordCount = 0;
                 int importedCount = 0;
 
-                await foreach (var record in ReadAllCsvRecordsAsync(filePath, cancellationToken))
+                // Use proper disposal pattern
+                await using (var recordEnumerator = ReadAllCsvRecordsAsync(filePath, cancellationToken).GetAsyncEnumerator(cancellationToken))
                 {
-                    recordCount++;
+                    var batch = new List<DataSet>(BatchSize);
 
-                    var dataSet = MapToDataSet(record, fileRecord, lookupCache);
-                    batch.Add(dataSet);
+                    while (await recordEnumerator.MoveNextAsync())
+                    {
+                        recordCount++;
+                        var record = recordEnumerator.Current;
 
-                    if (batch.Count >= BatchSize)
+                        var dataSet = MapToDataSet(record, fileRecord, lookupCache);
+                        batch.Add(dataSet);
+
+                        if (batch.Count >= BatchSize)
+                        {
+                            _context.DataSets.AddRange(batch);
+                            await _context.SaveChangesAsync(cancellationToken);
+                            importedCount += batch.Count;
+                            batch.Clear();
+
+                            progress?.Report(new ImportProgress
+                            {
+                                FileName = Path.GetFileName(filePath),
+                                CurrentRecord = importedCount,
+                                TotalRecords = 0,
+                                CurrentStatus = $"Inserted {importedCount} records..."
+                            });
+                        }
+                    }
+
+                    // Save remaining batch
+                    if (batch.Count > 0)
                     {
                         _context.DataSets.AddRange(batch);
                         await _context.SaveChangesAsync(cancellationToken);
                         importedCount += batch.Count;
-                        batch.Clear();
-
-                        progress?.Report(new ImportProgress
-                        {
-                            CurrentRecord = importedCount,
-                            TotalRecords = 0,
-                            CurrentStatus = $"Inserted {importedCount} records..."
-                        });
                     }
-                }
 
-                // Save remaining batch
-                if (batch.Count > 0)
-                {
-                    _context.DataSets.AddRange(batch);
-                    await _context.SaveChangesAsync(cancellationToken);
-                    importedCount += batch.Count;
+                    batch.Clear();
+                    batch = null;
                 }
 
                 // Update file record with completion time
@@ -142,6 +153,7 @@ namespace QualityControl.WPF.Services
 
                 progress?.Report(new ImportProgress
                 {
+                    FileName = Path.GetFileName(filePath),
                     CurrentRecord = importedCount,
                     TotalRecords = recordCount,
                     CurrentStatus = "Import completed successfully!"
@@ -171,6 +183,10 @@ namespace QualityControl.WPF.Services
             finally
             {
                 result.EndTime = DateTime.Now;
+                // Force garbage collection after large import
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
             }
 
             return result;
@@ -196,7 +212,7 @@ namespace QualityControl.WPF.Services
             }
         }
 
-        private async Task BulkUpsertLookupTablesAsync(IAsyncEnumerable<DataSetCsvRecord> records, CancellationToken cancellationToken)
+        private async Task BulkUpsertLookupTablesAsync(string filePath, CancellationToken cancellationToken)
         {
             // Collect unique values while streaming
             var uniqueLicenses = new HashSet<string>();
@@ -208,16 +224,21 @@ namespace QualityControl.WPF.Services
             var uniqueOperationCodes = new HashSet<string>();
             var uniqueResultTypes = new HashSet<string>();
 
-            await foreach (var record in records.WithCancellation(cancellationToken))
+            // Use proper disposal with GetAsyncEnumerator
+            await using (var enumerator = ReadAllCsvRecordsAsync(filePath, cancellationToken).GetAsyncEnumerator(cancellationToken))
             {
-                uniqueLicenses.Add(record.License);
-                uniqueVins.Add(record.VIN);
-                uniqueProjects.Add(record.Model.Split(".")[0]);
-                uniqueModels.Add(record.Model);
-                uniqueReportTypes.Add(record.ReportType);
-                uniqueCategories.Add(record.Category);
-                uniqueOperationCodes.Add(record.OperationCode);
-                uniqueResultTypes.Add(record.ResultType);
+                while (await enumerator.MoveNextAsync())
+                {
+                    var record = enumerator.Current;
+                    uniqueLicenses.Add(record.License);
+                    uniqueVins.Add(record.VIN);
+                    uniqueProjects.Add(record.Model.Split(".")[0]);
+                    uniqueModels.Add(record.Model);
+                    uniqueReportTypes.Add(record.ReportType);
+                    uniqueCategories.Add(record.Category);
+                    uniqueOperationCodes.Add(record.OperationCode);
+                    uniqueResultTypes.Add(record.ResultType);
+                }
             }
 
             // Load existing values
@@ -249,8 +270,27 @@ namespace QualityControl.WPF.Services
             if (newReportTypes.Count > 0) _context.ReportTypes.AddRange(newReportTypes);
             if (newOperationCodes.Count > 0) _context.OperationCodes.AddRange(newOperationCodes);
             if (newResultTypes.Count > 0) _context.ResultTypes.AddRange(newResultTypes);
-           
+
             await _context.SaveChangesAsync(cancellationToken);
+
+            // Clear collections to free memory
+            uniqueLicenses.Clear();
+            uniqueVins.Clear();
+            uniqueProjects.Clear();
+            uniqueModels.Clear();
+            uniqueReportTypes.Clear();
+            uniqueCategories.Clear();
+            uniqueOperationCodes.Clear();
+            uniqueResultTypes.Clear();
+
+            existingLicenses.Clear();
+            existingVins.Clear();
+            existingProjects.Clear();
+            existingModels.Clear();
+            existingReportTypes.Clear();
+            existingCategories.Clear();
+            existingOperationCodes.Clear();
+            existingResultTypes.Clear();
         }
 
         private static string GetFileHash(string filePath, HashAlgorithm algorithm)
@@ -269,16 +309,22 @@ namespace QualityControl.WPF.Services
             string hash = GetFileHash(filePath, SHA256.Create());
             short week = Convert.ToInt16(fileName.Substring(2, 2));
             int year = Convert.ToInt32(fileName.Substring(5, 4));
-            string projectName = fileName.Substring(10, fileName.Length - 14);
 
-            var existingFile = await _context.Files
-                .FirstOrDefaultAsync(f => f.Name == fileName && f.Hash == hash, cancellationToken);
+            var existingFile = await _context.Files.FirstOrDefaultAsync(f => f.Name == fileName && f.Hash == hash, cancellationToken);
 
             if (existingFile != null)
             {
                 throw new FileAlreadyImportedException(
                     $"File '{fileName}' has already been imported successfully. " +
                     "To re-import, please delete the existing file record first.");
+            }
+
+            existingFile = await _context.Files.FirstOrDefaultAsync(f => f.Name == fileName && f.Hash != hash, cancellationToken);
+            if (existingFile != null)
+            {
+                var rowsToDelete = _context.DataSets.Where(d => d.File_Id == existingFile.Id).ExecuteDeleteAsync();
+               _context.Files.Remove(existingFile);
+                await _context.SaveChangesAsync(cancellationToken);
             }
 
             var fileRecord = new File
@@ -289,18 +335,6 @@ namespace QualityControl.WPF.Services
                 Week = week,
                 Year = year,
             };
-
-            //var projects = await _context.Projects.AsNoTracking()
-            //    .ToDictionaryAsync(x => x.Name, x => x.Id, cancellationToken);
-
-            //if (projects.TryGetValue(projectName, out int value))
-            //{
-            //    fileRecord.Project_Id = value;
-            //}
-            //else
-            //{
-            //    fileRecord.Project = new Project { Name = projectName };
-            //}
 
             return fileRecord;
         }

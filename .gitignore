@@ -59,3 +59,4 @@ artifacts/
 *.ntvs*
 *.njsproj
 *.sw?
+QualityControl.WPF/qualitycontrol.db

@@ -24,6 +24,7 @@ namespace QualityControl.WPF.Services
 
     public class ImportProgress
     {
+        public required string FileName { get; set; }
         public int CurrentRecord { get; set; }
         public int TotalRecords { get; set; }
         public int PercentComplete => TotalRecords > 0 ? (CurrentRecord * 100) / TotalRecords : 0;

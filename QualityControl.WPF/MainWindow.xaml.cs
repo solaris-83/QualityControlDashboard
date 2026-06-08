@@ -90,6 +90,10 @@ namespace QualityControl.WPF
                     //ct.CancelAfter(TimeSpan.FromSeconds(30));
                     ct.Token.ThrowIfCancellationRequested(); // TODO set catch exception
 
+                    Progress<ImportProgress> progress = new Progress<ImportProgress>(i =>
+                    {
+                        _messenger.Publish(true, i);
+                    });
                     ImportResult importResult = null;
                     DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $"QualityControl\\{request.Year}\\wk{request.Week}"));
                     
@@ -97,7 +101,7 @@ namespace QualityControl.WPF
                     {
                         if (!ct.IsCancellationRequested)
                         {
-                            importResult = await _csvImportService.ImportCsvAsync(file.FullName, null, ct.Token);
+                            importResult = await _csvImportService.ImportCsvAsync(file.FullName, progress, ct.Token);
                             importResults.Add(importResult);
                         }
                     }
