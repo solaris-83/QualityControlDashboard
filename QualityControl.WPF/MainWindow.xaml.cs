@@ -81,6 +81,20 @@ namespace QualityControl.WPF
                     return true;
                 });
 
+            _messenger.RegisterHandler<object, List<FileDto>>(
+                "files.get",
+                async user =>
+                {
+                    return await _context.Files.Select(f => new FileDto
+                    {
+                        Week = f.Week,
+                        Year = f.Year,
+                        Name = f.Name,
+                        StartUploadedAt = f.StartImportAt,
+                        StopUploadedAt = f.EndImportAt
+                    }).ToListAsync();
+                });
+
             _messenger.RegisterHandler<FileRequestDto, List<ImportResult>>(
                 "csv.upload", 
                 async request =>
