@@ -83,7 +83,7 @@ export function useUserForm() {
         try {
 
             const result = await bus.request<FileRequestDto>(
-                "csv.upload",
+                "files.upload",
                fileRequest , 1800000)
 
             console.log("Upload result:", result)

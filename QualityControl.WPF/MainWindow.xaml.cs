@@ -96,7 +96,7 @@ namespace QualityControl.WPF
                 });
 
             _messenger.RegisterHandler<FileRequestDto, List<ImportResult>>(
-                "csv.upload", 
+                "files.upload", 
                 async request =>
                 {
                     List<ImportResult> importResults = [];
@@ -109,14 +109,27 @@ namespace QualityControl.WPF
                         _messenger.Publish(true, i);
                     });
                     ImportResult importResult = null;
-                    DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $"QualityControl\\{request.Year}\\wk{request.Week}"));
-                    
-                    foreach (var file in directoryInfo.GetFiles().Where(f => request.Projects.Any(project => f.Name.Contains(project))))
+                    DirectoryInfo[] dirs = null;
+                    if (request.Week == -1)
                     {
-                        if (!ct.IsCancellationRequested)
+                        DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @$"QualityControl\{request.Year}"));
+                        dirs = directoryInfo.GetDirectories();
+                    }
+                    else
+                    {
+                        DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @$"QualityControl\{request.Year}\wk{request.Week}"));
+                        dirs = new[] { directoryInfo };
+                    }
+
+                    foreach (var dir in dirs)
+                    {
+                        foreach (var file in dir.GetFiles().Where(f => request.Projects.Any(project => f.Name.Contains(project))))
                         {
-                            importResult = await _csvImportService.ImportCsvAsync(file.FullName, progress, ct.Token);
-                            importResults.Add(importResult);
+                            if (!ct.IsCancellationRequested)
+                            {
+                                importResult = await _csvImportService.ImportCsvAsync(file.FullName, progress, ct.Token);
+                                importResults.Add(importResult);
+                            }
                         }
                     }
                     return importResults;
