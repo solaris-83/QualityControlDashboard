@@ -41,6 +41,7 @@ namespace QualityControl.WPF
 
             // Services
             services.AddScoped<IUserService, UserService>();
+            services.AddTransient<IDataSetService, DataSetService>();
             services.AddTransient<ICsvImportService, CsvImportService>();
             
             // Messenger - Scoped so each MainWindow instance gets its own messenger

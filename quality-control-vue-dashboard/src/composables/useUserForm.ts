@@ -1,119 +1,144 @@
-import { ref, computed } from "vue"
-import { UserDto } from "../models/user-dto"
-import { bus } from "../services/webviewMessenger"
-import { FileRequestDto } from "../models/file-request-dto"
+import { ref, computed } from "vue";
+import { UserDto } from "../models/user-dto";
+import { bus } from "../services/webviewMessenger";
+import { FileRequestDto } from "../models/file-request-dto";
+import { logError, logSuccess, logInfo } from "../log";
+import { ImportResult } from "../models/import-result";
+import { ImportProgress } from "../models/import-progress";
+import { DataSetResponseDto } from "../models/data-set-response-dto";
+import { DataSetRequestDto } from "../models/data-set-request-dto";
+import { StreamSubscription } from "../services/streamSubscription";
+import { FileResponseDto } from "../models/file-response-dto";
 
 export function useUserForm() {
+  const loading = ref(false);
 
-    const loading = ref(false)
+  const saving = ref(false);
 
-    const saving = ref(false)
+  const user = ref<UserDto>({
+    id: 0,
+    firstName: "",
+    lastName: "",
+    email: "",
+    age: 18,
+  });
 
-    const user = ref<UserDto>({
-        id: 0,
-        firstName: "",
-        lastName: "",
-        email: "",
-        age: 18
-    })
+  const errors = ref<string[]>([]);
 
-    const errors = ref<string[]>([])
+  const isValid = computed(() => {
+    errors.value = [];
 
-    const isValid = computed(() => {
+    if (!user.value.firstName) errors.value.push("First Name required");
 
-        errors.value = []
+    if (!user.value.lastName) errors.value.push("Last Name required");
 
-        if (!user.value.firstName)
-            errors.value.push("First Name required")
+    if (!user.value.email) errors.value.push("Email required");
 
-        if (!user.value.lastName)
-            errors.value.push("Last Name required")
+    return errors.value.length === 0;
+  });
 
-        if (!user.value.email)
-            errors.value.push("Email required")
+  async function loadDataSetByWeekAndYear(week: number, year: number) {
+    loading.value = true;
+    const req = new DataSetRequestDto();
+    req.week = week;
+    req.year = year;
+    const subscriptionData: StreamSubscription<DataSetResponseDto> = {
+      streamId: "datasets.get",
+      next: (chunk: DataSetResponseDto[]) => {
+        logInfo(`Received data set chunk: ${chunk.length} records`);
+        chunk.forEach((dto: DataSetResponseDto) => {
+          logInfo(
+            `DataSet - ID: ${dto.id}, Week: ${dto.week}, Year: ${dto.year}, License: ${dto.license}, VIN: ${dto.vIN}, Model: ${dto.model}, AppName: ${dto.appName}, ResultType: ${dto.resultType}, ErrorCode: ${dto.errorCode}`,
+          );
+        });
+      },
+      completed: () => {
+        logSuccess("Data set stream completed");
+      },
+      error: (err: any) => {
+        logError("Data set stream error: " + err);
+      },
+    };
 
-        return errors.value.length === 0
-    })
+    try {
+      bus.subscribeStream<DataSetResponseDto>(subscriptionData, req);
 
-    async function loadUser(id: number) {
-
-        loading.value = true
-
-        try {
-
-            const result =
-                await bus.request<UserDto>(
-                    "user.get",
-                    { id })
-
-            user.value = result
-        }
-        finally {
-
-            loading.value = false
-        }
+      // user.value = result
+    } finally {
+      loading.value = false;
     }
+  }
 
-    async function saveUser() {
+  async function loadImportedFiles() {
 
-        if (!isValid.value)
-            return
+    saving.value = true;
 
-        saving.value = true
-
-        try {
-
-            await bus.request(
-                "user.save",
-                user.value)
-
-            alert("Saved")
-        }
-        finally {
-
-            saving.value = false
-        }
+    try {
+      const results : FileResponseDto[] = await bus.request("files.get", null);
+      logSuccess("Files retrieved: " + results
+            .map(
+              (r) =>
+                `week: ${r.week} year: ${r.year} name: ${r.name} startImportedAt: ${r.startImportedAt.toISOString()} endImportedAt: ${r.endImportedAt.toISOString()}`,
+            )
+            .join("\n"),
+    } 
+    finally {
+      saving.value = false;
     }
+  }
 
-    async function uploadFile(fileRequest: FileRequestDto) {
+  async function uploadFile(fileRequest: FileRequestDto) {
+    loading.value = true;
 
-      
-        loading.value = true
+    try {
+      bus.subscribe<ImportProgress>("csv.upload.progress", (msg) => {
+        logInfo(
+          "Upload progress: " +
+            msg.percentComplete.toString() +
+            "% - " +
+            msg.currentStatus,
+        );
+      });
 
-        try {
+      const result: ImportResult[] = await bus.request<ImportResult[]>(
+        "files.upload",
+        fileRequest,
+        1800000,
+      );
 
-            const result = await bus.request<FileRequestDto>(
-                "files.upload",
-               fileRequest , 1800000)
-
-            console.log("Upload result:", result)
-        }
-        finally {
-
-            loading.value = false
-        }
+      logSuccess(
+        "Upload result:" +
+          result
+            .map(
+              (r) =>
+                `${r.fullName}: ${r.success ? "Success" : "Failed"} (${r.recordsImported} imported, ${r.recordsSkipped} skipped)`,
+            )
+            .join("\n"),
+      );
+    } finally {
+      loading.value = false;
     }
+  }
 
-    function clear() {
+  function clear() {
+    user.value = {
+      id: 0,
+      firstName: "",
+      lastName: "",
+      email: "",
+      age: 18,
+    };
+  }
 
-        user.value = {
-            id: 0,
-            firstName: "",
-            lastName: "",
-            email: "",
-            age: 18
-        }
-    }
-
-    return {
-        user,
-        loading,
-        saving,
-        errors,
-        isValid,
-        loadUser,
-        saveUser,
-        uploadFile,
-        clear
-    }
+  return {
+    user,
+    loading,
+    saving,
+    errors,
+    isValid,
+    loadDataSetByWeekAndYear,
+    loadImportedFiles,
+    uploadFile,
+    clear,
+  };
 }

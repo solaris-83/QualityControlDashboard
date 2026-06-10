@@ -506,14 +506,6 @@ namespace QualityControl.WPF.Services
             IDbContextTransaction transaction,
             CancellationToken cancellationToken)
         {
-            progress?.Report(new ImportProgress
-            {
-                FileName = fileName,
-                CurrentRecord = 0,
-                TotalRecords = 0,
-                CurrentStatus = "Validating file..."
-            });
-
          //   await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
             try
@@ -540,6 +532,13 @@ namespace QualityControl.WPF.Services
 
                 if (existingFile != null)
                 {
+                    progress?.Report(new ImportProgress
+                    {
+                        FileName = fileName,
+                        CurrentRecord = 0,
+                        TotalRecords = 0,
+                        CurrentStatus = "Deleting rows of the previous import since a new file with the same name and different hash has been published...."
+                    });
                     // OPTIMIZATION: Delete in separate batch to avoid loading all rows into memory
                     await _context.DataSets
                         .Where(d => d.File_Id == existingFile.Id)
@@ -548,6 +547,14 @@ namespace QualityControl.WPF.Services
                     _context.Files.Remove(existingFile);
                     await _context.SaveChangesAsync(cancellationToken);
                 }
+
+                progress?.Report(new ImportProgress
+                {
+                    FileName = fileName,
+                    CurrentRecord = 0,
+                    TotalRecords = 0,
+                    CurrentStatus = "Validating file..."
+                });
 
                 // Extract project name and link
                 var projectName = fileName.Substring(10, fileName.Length - 14);

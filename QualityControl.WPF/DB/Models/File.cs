@@ -22,7 +22,7 @@ namespace QualityControl.WPF.DB.Models
         [MaxLength(255)]
         public string Name { get; set; } = string.Empty;
 
-        public DateTime? StartImportAt { get; set; }
+        public DateTime StartImportAt { get; set; }
 
         public DateTime? EndImportAt { get; set; }
 

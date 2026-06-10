@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Xml.Linq;
 
 namespace QualityControl.WPF
 {
@@ -20,18 +21,21 @@ namespace QualityControl.WPF
         private readonly IUserService _userService;
         private readonly ICsvImportService _csvImportService;
         private readonly AppDbContext _context;
+        private readonly IDataSetService _dataSetService;
 
         public MainWindow(
             IUserService userService, 
             AppDbContext context,
             IWebViewMessenger messenger, 
-            ICsvImportService csvImportService)
+            ICsvImportService csvImportService, 
+            IDataSetService dataSetService)
         {
             _context = context;
             _userService = userService;
             _messenger = messenger;
             _csvImportService = csvImportService;
-            
+            _dataSetService = dataSetService;
+
             InitializeComponent();
             Loaded += OnLoaded;
             
@@ -40,6 +44,9 @@ namespace QualityControl.WPF
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
+            Environment.SetEnvironmentVariable(
+    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+    "--remote-debugging-port=9222");
             await Browser.EnsureCoreWebView2Async();
 
             // Initialize the messenger with the WebView2 control
@@ -66,38 +73,65 @@ namespace QualityControl.WPF
 
         private void RegisterHandlers()
         {
-            _messenger.RegisterHandler<UserRequest, UserDto>(
-                "user.get", 
-                async request =>
-                {
-                    return await _userService.GetUserAsync(request!.Id);
-                });
+            //_messenger.RegisterHandler<UserRequest, UserDto>(
+            //    "user.get", 
+            //    async request =>
+            //    {
+            //        return await _userService.GetUserAsync(request!.Id);
+            //    });
 
-            _messenger.RegisterHandler<UserDto, bool>(
-                "user.save", 
-                async user =>
-                {
-                    await _userService.SaveUserAsync(user!);
-                    return true;
-                });
+            //_messenger.RegisterHandler<UserDto, bool>(
+            //    "user.save", 
+            //    async user =>
+            //    {
+            //        await _userService.SaveUserAsync(user!);
+            //        return true;
+            //    });
 
-            _messenger.RegisterHandler<object, List<FileDto>>(
+            _messenger.RegisterHandler<DataSetRequestDto, StreamChunk<DataSetResponseDto>>("datasets.get", async request =>
+            {
+                var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                int chunkSize = 100; // Define the size of each chunk
+                int chunkNumber = 0;
+                var chunk = new List<DataSetResponseDto>();
+                
+                await foreach (var item in _dataSetService.GetAsync(request, cancellationTokenSource.Token))
+                {
+                    chunk.Add(item);
+                    
+                    if (chunk.Count >= chunkSize)
+                    {
+                        var intermediateChunk = new StreamChunk<DataSetResponseDto>("datasets.get", chunkNumber, chunk, isLastChunk: false);
+                       // await _messenger.Publish(intermediateChunk);
+                        _messenger.Publish(TypeEnum.Stream, intermediateChunk, "datasets.get", correlationId: "");
+                        chunkNumber++;
+                        chunk = new List<DataSetResponseDto>();
+                    }
+                }
+                
+                // Send the final chunk with any remaining items
+                var finalChunk = new StreamChunk<DataSetResponseDto>("datasets.get", chunkNumber, chunk, isLastChunk: true);
+                return finalChunk;
+            });
+
+            _messenger.RegisterHandler<object, List<FileResponseDto>>(
                 "files.get",
                 async user =>
                 {
-                    return await _context.Files.Select(f => new FileDto
+                    return await _context.Files.Select(f => new FileResponseDto
                     {
+                        Id = f.Id,
                         Week = f.Week,
                         Year = f.Year,
                         Name = f.Name,
-                        StartUploadedAt = f.StartImportAt,
-                        StopUploadedAt = f.EndImportAt
+                        StartImportedAt = f.StartImportAt,
+                        EndImportedAt = f.EndImportAt
                     }).ToListAsync();
                 });
 
             _messenger.RegisterHandler<FileRequestDto, List<ImportResult>>(
                 "files.upload", 
-                async request =>
+                async request => // TODO Mettere nel handler un pattern che se va in errore la lambda expression allora notifica a TS
                 {
                     List<ImportResult> importResults = [];
                     using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(1800));
@@ -106,7 +140,7 @@ namespace QualityControl.WPF
 
                     Progress<ImportProgress> progress = new Progress<ImportProgress>(i =>
                     {
-                        _messenger.Publish(true, i);
+                        _messenger.Publish(TypeEnum.Event, i, "csv.upload.progress");
                     });
                     ImportResult importResult = null;
                     DirectoryInfo[] dirs = null;

@@ -1,116 +1,96 @@
 <template>
 
-<div class="page">
+    <div class="page">
 
-    <h1>User Form</h1>
+        <h1>User Form</h1>
 
-    <div v-if="loading">
-        Loading...
-    </div>
-
-    <div v-else>
-
-        <div class="form-row">
-
-            <label>Id</label>
-
-            <input
-                type="number"
-                v-model="user.id" />
+        <div v-if="loading">
+            Loading...
         </div>
 
-        <div class="form-row">
+        <div v-else>
 
-            <label>First Name</label>
+            <div class="form-row">
 
-            <input
-                type="text"
-                v-model="user.firstName" />
-        </div>
+                <label>Id</label>
 
-        <div class="form-row">
+                <input type="number" v-model="user.id" />
+            </div>
 
-            <label>Last Name</label>
+            <div class="form-row">
 
-            <input
-                type="text"
-                v-model="user.lastName" />
-        </div>
+                <label>First Name</label>
 
-        <div class="form-row">
+                <input type="text" v-model="user.firstName" />
+            </div>
 
-            <label>Email</label>
+            <div class="form-row">
 
-            <input
-                type="email"
-                v-model="user.email" />
-        </div>
+                <label>Last Name</label>
 
-        <div class="form-row">
+                <input type="text" v-model="user.lastName" />
+            </div>
 
-            <label>Age</label>
+            <div class="form-row">
 
-            <input
-                type="number"
-                v-model="user.age" />
-        </div>
+                <label>Email</label>
 
-        <div
-            v-if="errors.length"
-            class="validation">
+                <input type="email" v-model="user.email" />
+            </div>
 
-            <ul>
+            <div class="form-row">
 
-                <li
-                    v-for="e in errors"
-                    :key="e">
+                <label>Age</label>
 
-                    {{ e }}
+                <input type="number" v-model="user.age" />
+            </div>
 
-                </li>
+            <div v-if="errors.length" class="validation">
 
-            </ul>
+                <ul>
 
-        </div>
+                    <li v-for="e in errors" :key="e">
 
-        <div class="buttons">
+                        {{ e }}
 
-            <button
-                @click="loadUser(1)">
+                    </li>
 
-                Load
-            </button>
+                </ul>
 
-            <button
-                @click="saveUser"
-                :disabled="saving">
+            </div>
 
-                Save
-            </button>
+            <div class="buttons">
 
-            <button
-                @click="clear">
+                <button @click="loadDataSetByWeekAndYear(17, 2026)">
 
-                Clear
-            </button>
-            <button
-                @click="uploadDefaultFile()"
-                :disabled="loading">
+                    Load
+                </button>
 
-                Upload
-            </button>
+                <button @click="loadImportedFiles()" :disabled="saving">
+
+                    Save
+                </button>
+
+                <button @click="clear">
+
+                    Clear
+                </button>
+                <button @click="uploadDefaultFile()" :disabled="loading">
+
+                    Upload
+                </button>
+            </div>
+
         </div>
 
     </div>
-
-</div>
 
 </template>
 
 <script setup lang="ts">
 
 import { useUserForm }
-from "../composables/useUserForm"
+    from "../composables/useUserForm"
 import { FileRequestDto } from "../models/file-request-dto";
 
 const {
@@ -118,18 +98,18 @@ const {
     loading,
     saving,
     errors,
-    loadUser,
-    saveUser,
+    loadDataSetByWeekAndYear,
+    loadImportedFiles,
     uploadFile,
     clear
 }
-=
-useUserForm()
+    =
+    useUserForm()
 
 function uploadDefaultFile() {
 
     const request = new FileRequestDto()
-    request.week = 17
+    request.week = 20
     request.year = 2026
     request.projects = ["BUS_ADAS", "TRUCK_L24", "TRUCK_MH24"]
 
@@ -139,7 +119,6 @@ function uploadDefaultFile() {
 </script>
 
 <style scoped>
-
 .page {
     max-width: 600px;
     margin: auto;
@@ -175,5 +154,4 @@ function uploadDefaultFile() {
 button {
     padding: 10px 16px;
 }
-
 </style>

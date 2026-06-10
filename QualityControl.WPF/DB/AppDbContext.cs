@@ -26,6 +26,11 @@ namespace QualityControl.WPF.DB
         {
         }
 
+        override public void Dispose()
+        {
+            base.Dispose();
+        }
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             // Only configure if not already configured (for design-time support)

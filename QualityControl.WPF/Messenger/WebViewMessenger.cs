@@ -23,11 +23,7 @@ namespace QualityControl.WPF.Messenger
             _webView = webView ?? throw new ArgumentNullException(nameof(webView));
         }
 
-        public void RegisterHandler<
-            TRequest,
-            TResponse>(
-            string messageType,
-            Func<TRequest?, Task<TResponse>> handler)
+        public void RegisterHandler<TRequest, TResponse>(string messageType, Func<TRequest?, Task<TResponse>> handler)
         {
             _handlers[messageType] =
                 async payload =>
@@ -51,32 +47,21 @@ namespace QualityControl.WPF.Messenger
             if (message == null)
                 return;
 
-            if (!_handlers.TryGetValue(message.Type, out var handler))
+            if (!_handlers.TryGetValue(message.Name, out var handler))
                 return;
 
             var response = await handler(message.Payload);
 
-            Publish(true, response, "", message.Id);
-            var responseMessage =
-                new WebMessage
-                {
-                    IsResponse = true,
-                    CorrelationId = message.Id,
-                    Payload = response
-                };
-
-            var responseJson = JsonSerializer.Serialize(responseMessage, _options);
-
-            _webView.CoreWebView2.PostWebMessageAsJson(responseJson);
+            Publish(message.Type, response, message.Name, message.Id); 
         }
 
-        public void Publish(bool isResponse, object? payload, string type = "", string? correlationId = null)
+        public void Publish(TypeEnum type, object? payload, string name = "", string? correlationId = null)
         {
             var webMessage = new WebMessage
             {
-                IsResponse = isResponse,
-                CorrelationId = correlationId,
                 Type = type,
+                CorrelationId = correlationId,
+                Name = name,
                 Payload = payload
             };
 
