@@ -105,7 +105,7 @@ namespace QualityControl.WPF
                        // await _messenger.Publish(intermediateChunk);
                         _messenger.Publish(TypeEnum.Stream, intermediateChunk, "datasets.get", correlationId: "");
                         chunkNumber++;
-                        chunk = new List<DataSetResponseDto>();
+                        chunk.Clear();
                     }
                 }
                 
@@ -157,6 +157,9 @@ namespace QualityControl.WPF
 
                     foreach (var dir in dirs)
                     {
+                        if (!Directory.Exists(dir.FullName))
+                            continue; // TODO magari notificare
+
                         foreach (var file in dir.GetFiles().Where(f => request.Projects.Any(project => f.Name.Contains(project))))
                         {
                             if (!ct.IsCancellationRequested)

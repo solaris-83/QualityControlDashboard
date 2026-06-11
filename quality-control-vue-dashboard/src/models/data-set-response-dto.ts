@@ -8,9 +8,11 @@ export class DataSetResponseDto {
     week: number;
     year: number;
     license: string = "";
-    vIN: string = "";
+    vin: string = "";
     model: string = "";
     appName: string = "";
     resultType: string = "";
     errorCode: string = "";
+    elapsedTime: string = "";
+    affectedControllers: string = "";
 }

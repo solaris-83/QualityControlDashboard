@@ -2,7 +2,7 @@ export interface StreamSubscription<T> {
 
     streamId: string
 
-    next(chunk: T[]): void
+    next(chunk: T[], chunkIndex: number): void
 
     completed(): void
 

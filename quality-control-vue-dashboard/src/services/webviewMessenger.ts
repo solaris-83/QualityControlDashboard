@@ -142,8 +142,8 @@ export class WebViewMessenger {
 
   private onMessage(message: WebMessage): void {
     switch (message.type) {
-      case TypeEnum.Response:
-        this.handleResponse(message);
+      case TypeEnum.Request:
+        this.handleRequest(message);
         break;
       case TypeEnum.Event:
         this.handleEvent(message);
@@ -152,19 +152,9 @@ export class WebViewMessenger {
         this.handleStream(message);
         break;
     }
-
-    /*   const streamId = message?.payload?.streamId ?? message?.type;
-
-        if (streamId && this.streamHandlers.has(streamId)) {
-            this.handleStream(message);
-
-            return;
-        }
-
-        this.handleEvent(message);*/
   }
 
-  private handleResponse(message: WebMessage): void {
+  private handleRequest(message: WebMessage): void {
     const request = this.pendingRequests.get(message.correlationId!);
 
     if (!request) return;
@@ -196,7 +186,7 @@ export class WebViewMessenger {
     if (!handler) return;
 
     if (chunk.items?.length)
-      handler.next(chunk.items);
+      handler.next(chunk.items, chunk.chunkIndex);
 
     if (chunk.isLastChunk) {
       handler.completed();

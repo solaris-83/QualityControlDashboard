@@ -12,6 +12,8 @@ import { FileResponseDto } from "../models/file-response-dto";
 
 export function useUserForm() {
   const loading = ref(false);
+  const dataSetRows = ref<DataSetResponseDto[]>([]);
+  const dataSetError = ref<string | null>(null);
 
   const saving = ref(false);
 
@@ -37,34 +39,42 @@ export function useUserForm() {
     return errors.value.length === 0;
   });
 
-  async function loadDataSetByWeekAndYear(week: number, year: number) {
+  async function loadDataSetByWeekAndYear(week: number, year: number, pageSize: number = 100, pageNumber: number = 1) {
     loading.value = true;
+    dataSetError.value = null;
+    dataSetRows.value = [];
+
     const req = new DataSetRequestDto();
     req.week = week;
     req.year = year;
+    req.pageSize = pageSize;
+    req.pageNumber = pageNumber;
     const subscriptionData: StreamSubscription<DataSetResponseDto> = {
       streamId: "datasets.get",
-      next: (chunk: DataSetResponseDto[]) => {
-        logInfo(`Received data set chunk: ${chunk.length} records`);
+      next: (chunk: DataSetResponseDto[], chunkIndex: number) => {
+        dataSetRows.value = [...dataSetRows.value, ...chunk];
+        logSuccess(`Received data set chunk: ${chunk.length} records (Chunk Index: ${chunkIndex})`);
         chunk.forEach((dto: DataSetResponseDto) => {
           logInfo(
-            `DataSet - ID: ${dto.id}, Week: ${dto.week}, Year: ${dto.year}, License: ${dto.license}, VIN: ${dto.vIN}, Model: ${dto.model}, AppName: ${dto.appName}, ResultType: ${dto.resultType}, ErrorCode: ${dto.errorCode}`,
+            `DataSet - ID: ${dto.id}, Week: ${dto.week}, Year: ${dto.year}, License: ${dto.license}, VIN: ${dto.vin}, Model: ${dto.model}, AppName: ${dto.appName}, ElapsedTime: ${dto.elapsedTime}, AffectedControllers: ${dto.affectedControllers}, ResultType: ${dto.resultType}, ErrorCode: ${dto.errorCode}`,
           );
         });
       },
       completed: () => {
         logSuccess("Data set stream completed");
+        loading.value = false;
       },
       error: (err: any) => {
         logError("Data set stream error: " + err);
+        dataSetError.value = err instanceof Error ? err.message : String(err);
+        loading.value = false;
       },
     };
 
     try {
       bus.subscribeStream<DataSetResponseDto>(subscriptionData, req);
-
-      // user.value = result
-    } finally {
+    } catch (err) {
+      dataSetError.value = err instanceof Error ? err.message : "Failed to load dataset.";
       loading.value = false;
     }
   }
@@ -78,9 +88,9 @@ export function useUserForm() {
       logSuccess("Files retrieved: " + results
             .map(
               (r) =>
-                `week: ${r.week} year: ${r.year} name: ${r.name} startImportedAt: ${r.startImportedAt.toISOString()} endImportedAt: ${r.endImportedAt.toISOString()}`,
+                `week: ${r.week} year: ${r.year} name: ${r.name} startImportedAt: ${r.startImportedAt.toLocaleString()} endImportedAt: ${r.endImportedAt.toLocaleString()}`,
             )
-            .join("\n"),
+            .join("\n"))
     } 
     finally {
       saving.value = false;
@@ -136,6 +146,8 @@ export function useUserForm() {
     saving,
     errors,
     isValid,
+    dataSetRows,
+    dataSetError,
     loadDataSetByWeekAndYear,
     loadImportedFiles,
     uploadFile,

@@ -7,7 +7,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <PackageIcon>icons8-dashboard-100.png</PackageIcon>
+    <ApplicationIcon>icons8-dashboard-100.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="icons8-dashboard-100.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="icons8-dashboard-100.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
@@ -27,12 +36,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="dashboard-64.png">
+    <Resource Include="icons8-dashboard-100.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
-    </None>
-    <None Update="icons8-dashboard-100.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="dashboard-64.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>

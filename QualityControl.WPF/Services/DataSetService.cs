@@ -17,7 +17,8 @@ namespace QualityControl.WPF.Services
                 .Include(d => d.Model)
                 .Include(d => d.ResultType)
                 .Include(d => d.File)
-                .Take(111)
+                .Skip((requestDto.PageNumber - 1) * requestDto.PageSize)
+                .Take(requestDto.PageSize)
                 .AsAsyncEnumerable()
                 .WithCancellation(cancellationToken))
             {
@@ -27,11 +28,13 @@ namespace QualityControl.WPF.Services
                     Week = row.File.Week,
                     Year = row.File.Year,
                     License = row.License.Name,
-                    VIN = row.VIN.Code,
+                    Vin = row.VIN.Code,
                     Model = row.Model.Name,
                     AppName = row.AppName!,
                     ResultType = row.ResultType.Name,
-                    ErrorCode = row.ErrorCode
+                    ErrorCode = row.ErrorCode,
+                    ElapsedTime = row.ElapsedTime,
+                    AffectedControllers = row.AffectedControllers
                 };
             }
         }

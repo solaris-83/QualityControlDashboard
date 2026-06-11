@@ -7,6 +7,8 @@ namespace QualityControl.WPF.Models
     {
         public int Week { get; set; }
         public int Year { get; set; }
+        public int PageNumber { get; set; } = 1;
+        public int PageSize { get; set; } = int.MaxValue;
     }
 
     [ExportTsClass(OutputDir = "../quality-control-vue-dashboard/src/models")]
@@ -16,10 +18,12 @@ namespace QualityControl.WPF.Models
         public int Week { get; set; }
         public int Year { get; set; }
         public string License { get; set; } = "";
-        public string VIN { get; set; } = "";
+        public string Vin { get; set; } = "";
         public string Model { get; set; } = "";
         public string AppName { get; set; } = "";
         public string ResultType { get; set; } = "";
         public string ErrorCode { get; set; } = "";
+        public string ElapsedTime { get; set; } = "";
+        public string AffectedControllers { get; set; } = "";
     }
 }

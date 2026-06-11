@@ -7,6 +7,7 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
         WindowState="Maximized"
+        Icon="/icons8-dashboard-100.ico"
         Title="Quality Control Dashboard" Height="1290" Width="1290">
     <Grid>
         <wv2:WebView2 x:Name="Browser"/>
