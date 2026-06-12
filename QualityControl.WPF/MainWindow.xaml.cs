@@ -71,6 +71,7 @@ namespace QualityControl.WPF
             // Browser.Source = new Uri(distIndexPath);
         }
 
+        // Fare classe statica fuori da MainWindow??
         private void RegisterHandlers()
         {
             //_messenger.RegisterHandler<UserRequest, UserDto>(
@@ -114,7 +115,7 @@ namespace QualityControl.WPF
                 return finalChunk;
             });
 
-            _messenger.RegisterHandler<object, List<FileResponseDto>>(
+            _messenger.RegisterHandler<object, List<FileResponseDto>>(  // TODO mettere filtro da TS
                 "files.get",
                 async user =>
                 {

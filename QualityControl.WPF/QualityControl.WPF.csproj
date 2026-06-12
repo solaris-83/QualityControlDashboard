@@ -11,10 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="icons8-dashboard-100.png" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Resource Include="icons8-dashboard-100.ico" />
   </ItemGroup>
 
@@ -33,14 +29,6 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.10" />
     <PackageReference Include="TypeGen" Version="7.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Resource Include="icons8-dashboard-100.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </Resource>
   </ItemGroup>
 
   <ItemGroup>

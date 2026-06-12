@@ -3,7 +3,6 @@
     <table class="dataset-table">
       <thead>
         <tr>
-          <th>ID</th>
           <th>Week</th>
           <th>Year</th>
           <th>License</th>
@@ -19,7 +18,6 @@
 
       <tbody v-if="rows.length > 0">
         <tr v-for="row in rows" :key="row.id">
-          <td>{{ row.id }}</td>
           <td>{{ row.week }}</td>
           <td>{{ row.year }}</td>
           <td>{{ row.license }}</td>

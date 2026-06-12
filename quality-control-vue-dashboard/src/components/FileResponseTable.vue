@@ -3,7 +3,6 @@
     <table class="file-table">
       <thead>
         <tr>
-          <th>ID</th>
           <th>Week</th>
           <th>Year</th>
           <th>Name</th>
@@ -14,7 +13,6 @@
 
       <tbody v-if="rows.length > 0">
         <tr v-for="row in rows" :key="row.id">
-          <td>{{ row.id }}</td>
           <td>{{ row.week }}</td>
           <td>{{ row.year }}</td>
           <td>{{ row.name }}</td>

@@ -25,24 +25,24 @@
       </div>
 
       <div class="actions">
-        <button type="button" :disabled="loading" @click="importCsv">Import New CSV</button>
-        <button type="button" class="secondary" :disabled="table.isLoading || loading" @click="loadFiles">Refresh</button>
+        <button type="button" :disabled="uploading" @click="importCsv">Import New CSV</button>
+        <button type="button" :disabled="loading" @click="loadFiles">Refresh</button>
       </div>
     </div>
 
-    <p v-if="loading">Uploading file...</p>
-    <p v-if="table.isLoading">Loading imported files...</p>
-    <p v-if="tableError" class="error">{{ tableError }}</p>
+    <p v-if="uploading">Uploading in progress ...</p>
+    <p v-if="loading">Loading imported files ...</p>
+    <p v-if="dataSetInfo">{{ dataSetInfo }}</p>
+    <p v-if="dataSetError" class="error">{{ dataSetError }}</p>
 
-    <FileResponseTable :items="table.rows" />
+    <FileResponseTable :items="dataSetRows" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import FileResponseTable from '../components/FileResponseTable.vue';
-import { useFilesTable } from '../composables/useFilesTable';
-import { useUserForm } from '../composables/useUserForm';
+import { useImportFiles } from '../composables/useImportFiles.ts';
 import { FileRequestDto } from '../models/file-request-dto';
 import { getISOWeek } from 'date-fns';
 
@@ -50,8 +50,7 @@ defineEmits<{
   (e: 'go-home'): void;
 }>();
 
-const { table, tableError, loadFiles } = useFilesTable();
-const { uploadFile, loading } = useUserForm();
+const { uploadFile, loading, uploading, dataSetInfo, dataSetRows, dataSetError, loadImportedFiles } = useImportFiles();
 
 const now = new Date();
 const week = ref(getISOWeek(now));
@@ -61,6 +60,11 @@ const projectsText = ref('BUS_ADAS,TRUCK_L24,TRUCK_MH24');
 onMounted(() => {
   loadFiles();
 });
+
+async function loadFiles() {
+
+  await loadImportedFiles();
+}
 
 async function importCsv() {
   const request = new FileRequestDto();

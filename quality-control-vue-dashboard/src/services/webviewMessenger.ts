@@ -1,7 +1,7 @@
-import { createId } from "./guid";
+import { createId } from "../miscellanea/guid";
 
 import { StreamChunk } from "../models/stream-chunk";
-import { StreamSubscription } from "./streamSubscription";
+import { StreamSubscription } from "../models/streamSubscription";
 import { WebMessage } from "../models/web-message";
 import { TypeEnum } from "../models/type-enum";
 

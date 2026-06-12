@@ -2,13 +2,15 @@
 
 namespace QualityControl.WPF.Models
 {
-    [ExportTsClass(OutputDir = "../quality-control-vue-dashboard/src/models")]
+    [ExportTsClass(OutputDir = "../quality-control-vue-dashboard/src/models")] // TODO mettere int per week and year e Type unions?
     public class FileResponseDto
     {
         public FileResponseDto()
         {
             
         }
+
+        // TODO aggiungere numero record importati per file
         public FileResponseDto(int id, int week, int year, string name, DateTime startUploadedAt, DateTime? stopUploadedAt)
         {
             Id = id;

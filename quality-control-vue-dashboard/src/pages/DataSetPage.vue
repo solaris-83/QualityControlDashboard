@@ -30,6 +30,7 @@
     </div>
 
     <p v-if="loading">Loading data set stream...</p>
+    <p v-if="dataSetInfo">{{ dataSetInfo }}</p>
     <p v-if="dataSetError" class="error">{{ dataSetError }}</p>
 
     <DataSetTable :items="dataSetRows" />
@@ -39,14 +40,14 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import DataSetTable from '../components/DataSetTable.vue';
-import { useUserForm } from '../composables/useUserForm';
 import { getISOWeek } from 'date-fns/getISOWeek';
+import { useDataSet } from '../composables/useDataSet.ts';
 
 defineEmits<{
   (e: 'go-home'): void;
 }>();
 
-const { loading, dataSetRows, dataSetError, loadDataSetByWeekAndYear } = useUserForm();
+const { loading, dataSetInfo, dataSetRows, dataSetError, loadDataSetByWeekAndYear } = useDataSet();
 
 const now = new Date();
 const week = ref(getISOWeek(now));
