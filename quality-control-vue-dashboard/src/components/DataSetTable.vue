@@ -10,8 +10,8 @@
           <th>Model</th>
           <th>App</th>
           <th>Result</th>
-          <th>Error</th>
-          <th>Elapsed</th>
+          <th>Error Code</th>
+          <th>Elapsed Time</th>
           <th>Affected Controllers</th>
         </tr>
       </thead>

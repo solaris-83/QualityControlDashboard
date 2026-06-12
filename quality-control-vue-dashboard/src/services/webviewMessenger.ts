@@ -2,7 +2,7 @@ import { createId } from "../miscellanea/guid";
 
 import { StreamChunk } from "../models/stream-chunk";
 import { StreamSubscription } from "../models/streamSubscription";
-import { WebMessage } from "../models/web-message";
+import { WebMessageDto } from "../models/web-message-dto";
 import { TypeEnum } from "../models/type-enum";
 
 type EventHandler<TResponse = any> = (payload: TResponse) => void;
@@ -38,7 +38,7 @@ export class WebViewMessenger {
   }
 
   private publish(type: TypeEnum, payload?: any): void {
-    const message: WebMessage = {
+    const message: WebMessageDto = {
       id: createId(),
       type,
       payload,
@@ -69,7 +69,7 @@ export class WebViewMessenger {
         timeoutHandle,
       });
 
-      const message: WebMessage = {
+      const message: WebMessageDto = {
         id,
         type: TypeEnum.Request,
         payload,
@@ -113,7 +113,7 @@ export class WebViewMessenger {
       subscription as StreamSubscription<any>,
     );
 
-    const message: WebMessage = {
+    const message: WebMessageDto = {
       id: createId(),
       type: TypeEnum.Stream,
       name: subscription.streamId,
@@ -128,7 +128,7 @@ export class WebViewMessenger {
     this.streamHandlers.delete(streamId);
   }
 
-  private send(message: WebMessage): void {
+  private send(message: WebMessageDto): void {
     const webview = (window as any).chrome?.webview;
 
     if (!webview) {
@@ -140,7 +140,7 @@ export class WebViewMessenger {
     webview.postMessage(message);
   }
 
-  private onMessage(message: WebMessage): void {
+  private onMessage(message: WebMessageDto): void {
     switch (message.type) {
       case TypeEnum.Request:
         this.handleRequest(message);
@@ -154,7 +154,7 @@ export class WebViewMessenger {
     }
   }
 
-  private handleRequest(message: WebMessage): void {
+  private handleRequest(message: WebMessageDto): void {
     const request = this.pendingRequests.get(message.correlationId!);
 
     if (!request) return;
@@ -166,7 +166,7 @@ export class WebViewMessenger {
     this.pendingRequests.delete(message.correlationId!);
   }
 
-  private handleEvent(message: WebMessage): void {
+  private handleEvent(message: WebMessageDto): void {
     const handlers = this.eventHandlers.get(message.name);
 
     if (!handlers) return;
@@ -176,7 +176,7 @@ export class WebViewMessenger {
     }
   }
 
-  private handleStream(message: WebMessage): void {
+  private handleStream(message: WebMessageDto): void {
     const chunk = message.payload as StreamChunk<any>;
 
     if (!chunk) return;

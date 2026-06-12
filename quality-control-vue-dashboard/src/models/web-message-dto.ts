@@ -5,10 +5,10 @@
 
 import { TypeEnum } from "./type-enum";
 
-export class WebMessage {
-    id: string = "85ee4165-18c5-42ca-b463-8f336441a333";
+export class WebMessageDto {
+    id: string = "131b51b1-fb4c-4594-ba0c-52a2b0c103a5";
     type: TypeEnum;
     payload: Object;
     name: string;
-    correlationId: string;
+    correlationId: string | null;
 }

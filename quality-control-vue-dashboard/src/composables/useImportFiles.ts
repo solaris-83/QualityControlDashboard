@@ -3,12 +3,10 @@ import { UserDto } from "../models/user-dto";
 import { bus } from "../services/webviewMessenger";
 import { FileRequestDto } from "../models/file-request-dto";
 import { logError, logSuccess, logInfo } from "../miscellanea/log";
-import { ImportResult } from "../models/import-result";
-import { ImportProgress } from "../models/import-progress";
-import { DataSetResponseDto } from "../models/data-set-response-dto";
-import { DataSetRequestDto } from "../models/data-set-request-dto";
-import { StreamSubscription } from "../models/streamSubscription";
+import { ImportResultDto } from "../models/import-result-dto";
+import { ImportProgressDto } from "../models/import-progress-dto";
 import { FileResponseDto } from "../models/file-response-dto";
+import { Constants } from "../models/constants";
 
 export function useImportFiles() {
   const loading = ref(false);
@@ -19,14 +17,28 @@ export function useImportFiles() {
 
   const errors = ref<string[]>([]);
 
-  async function loadImportedFiles() {
+  // Function to load imported files based on week, year, and projects
+  // Sends a request to the backend (bus.request), waits for a response and updates the state with the retrieved file information
+  async function loadImportedFiles(
+    week: number,
+    year: number,
+    projects: string[],
+  ) {
     dataSetInfo.value = "Starting to load imported files...";
     dataSetError.value = null;
     dataSetRows.value = [];
     loading.value = true;
 
     try {
-      const results: FileResponseDto[] = await bus.request("files.get", null);
+      const fileRequest: FileRequestDto = new FileRequestDto();
+      fileRequest.week = week;
+      fileRequest.year = year;
+      fileRequest.projects = projects;
+
+      const results: FileResponseDto[] = await bus.request(
+        Constants.files_Get,
+        fileRequest,
+      );
       dataSetRows.value = [...dataSetRows.value, ...results];
       dataSetInfo.value = `Number of files retrieved: ${results.length}`;
       logSuccess(dataSetInfo.value);
@@ -41,19 +53,24 @@ export function useImportFiles() {
     }
   }
 
+  // Function to upload a file based on the provided file request information
+  // Subscribes to upload progress updates (bus.subscribe<ImportProgressDto>) and sends an upload request to the backend (bus.request)
   async function uploadFile(fileRequest: FileRequestDto) {
     uploading.value = true;
     dataSetInfo.value = "Starting file upload...";
     dataSetError.value = null;
 
     try {
-      bus.subscribe<ImportProgress>("csv.upload.progress", (msg) => {
-        dataSetInfo.value = `Upload progress: ${msg.percentComplete}% - ${msg.currentStatus}`;
-        logInfo(dataSetInfo.value);
-      });
+      bus.subscribe<ImportProgressDto>(
+        Constants.files_Upload_Progress,
+        (msg) => {
+          dataSetInfo.value = `Upload progress: ${msg.percentComplete}% - ${msg.currentStatus}`;
+          logInfo(dataSetInfo.value);
+        },
+      );
 
-      const result: ImportResult[] = await bus.request<ImportResult[]>(
-        "files.upload",
+      const result: ImportResultDto[] = await bus.request<ImportResultDto[]>(
+        Constants.files_Upload,
         fileRequest,
         1800000,
       );

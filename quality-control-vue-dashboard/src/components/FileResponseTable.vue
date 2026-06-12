@@ -8,6 +8,8 @@
           <th>Name</th>
           <th>Start Imported At</th>
           <th>End Imported At</th>
+          <th>N. records</th>
+          <th>Error Message</th>
         </tr>
       </thead>
 
@@ -18,6 +20,8 @@
           <td>{{ row.name }}</td>
           <td>{{ formatDate(row.startImportedAt) }}</td>
           <td>{{ formatDate(row.endImportedAt) }}</td>
+          <td>{{ row.numberOfRecords }}</td>
+          <td>{{ row.errorMessage}}</td>
         </tr>
       </tbody>
 

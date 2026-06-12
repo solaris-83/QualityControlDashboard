@@ -3,10 +3,10 @@
  * Any changes made to this file can be lost when this file is regenerated.
  */
 
-export class ImportProgress {
+export class ImportProgressDto {
     fileName: string;
     currentRecord: number;
     totalRecords: number;
     percentComplete: number;
-    currentStatus: string;
+    currentStatus: string | null;
 }

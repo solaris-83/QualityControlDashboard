@@ -25,6 +25,9 @@ namespace QualityControl.WPF.DB.Models
         public DateTime StartImportAt { get; set; }
 
         public DateTime? EndImportAt { get; set; }
+        public int NumberOfRecords { get; set; }
+
+        public string? ErrorMessage { get; set; }
 
         // Foreign Key to Project
         [Required]

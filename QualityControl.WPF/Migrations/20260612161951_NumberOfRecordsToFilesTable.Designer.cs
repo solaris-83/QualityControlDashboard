@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QualityControl.WPF.DB;
 
@@ -10,9 +11,11 @@ using QualityControl.WPF.DB;
 namespace QualityControl.WPF.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260612161951_NumberOfRecordsToFilesTable")]
+    partial class NumberOfRecordsToFilesTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.16");
@@ -126,9 +129,6 @@ namespace QualityControl.WPF.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("EndImportAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ErrorMessage")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Hash")

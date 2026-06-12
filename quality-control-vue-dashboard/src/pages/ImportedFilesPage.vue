@@ -25,8 +25,8 @@
       </div>
 
       <div class="actions">
+        <button type="button" :disabled="loading" @click="loadFiles">Load</button>
         <button type="button" :disabled="uploading" @click="importCsv">Import New CSV</button>
-        <button type="button" :disabled="loading" @click="loadFiles">Refresh</button>
       </div>
     </div>
 
@@ -63,7 +63,7 @@ onMounted(() => {
 
 async function loadFiles() {
 
-  await loadImportedFiles();
+  await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
 }
 
 async function importCsv() {

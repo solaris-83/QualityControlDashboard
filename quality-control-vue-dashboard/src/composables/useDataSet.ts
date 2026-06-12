@@ -3,6 +3,7 @@ import { bus } from "../services/webviewMessenger";
 import { DataSetResponseDto } from "../models/data-set-response-dto";
 import { DataSetRequestDto } from "../models/data-set-request-dto";
 import { StreamSubscription } from "../models/streamSubscription";
+import { Constants } from "../models/constants";
 import { logError, logInfo, logSuccess } from "../miscellanea/log";
 
 export function useDataSet() {
@@ -29,7 +30,7 @@ export function useDataSet() {
     req.pageNumber = pageNumber;
 
     const subscriptionData: StreamSubscription<DataSetResponseDto> = {
-      streamId: "datasets.get",
+      streamId: Constants.dataset_Get,
       next: (chunk: DataSetResponseDto[], chunkIndex: number) => {
         dataSetRows.value = [...dataSetRows.value, ...chunk];
         dataSetInfo.value = `Received data set chunk: ${chunk.length} records (Chunk Index: ${chunkIndex})`;

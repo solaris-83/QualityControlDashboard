@@ -5,14 +5,14 @@
 
 import { TimeSpan } from "./time-span";
 
-export class ImportResult {
+export class ImportResultDto {
     success: boolean;
     totalRecordsProcessed: number;
     recordsImported: number;
     recordsSkipped: number;
-    errorMessage: string;
+    errorMessage: string | null;
     startTime: Date;
     endTime: Date;
     duration: TimeSpan;
-    fullName: string = "";
+    fullName: string;
 }

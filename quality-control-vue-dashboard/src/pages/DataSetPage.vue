@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import DataSetTable from '../components/DataSetTable.vue';
 import { getISOWeek } from 'date-fns/getISOWeek';
 import { useDataSet } from '../composables/useDataSet.ts';
@@ -54,6 +54,10 @@ const week = ref(getISOWeek(now));
 const year = ref(now.getFullYear());
 const pageSize = ref(100);
 const pageNumber = ref(1);
+
+onMounted(() => {
+  loadData();
+});
 
 async function loadData() {
   await loadDataSetByWeekAndYear(

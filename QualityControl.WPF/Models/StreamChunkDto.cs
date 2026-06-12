@@ -8,14 +8,14 @@ using TypeGen.Core.TypeAnnotations;
 namespace QualityControl.WPF.Models
 {
     [ExportTsClass(OutputDir = "../quality-control-vue-dashboard/src/models")]
-    public class StreamChunk<T>
+    public class StreamChunkDto<T>
     {
-        public StreamChunk()
+        public StreamChunkDto()
         {
             
         }
 
-        public StreamChunk(string name, int chunkIndex, List<T> items, bool isLastChunk)
+        public StreamChunkDto(string name, int chunkIndex, List<T> items, bool isLastChunk)
         {
             Name = name;
             ChunkIndex = chunkIndex;

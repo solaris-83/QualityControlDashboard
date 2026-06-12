@@ -20,13 +20,14 @@ namespace QualityControl.WPF.Services
         private const int BatchSize = 5000;
         private const int LookupBatchSize = 1000;
 
-        public async Task<ImportResult> ImportCsvAsync(
+        public async Task<ImportResultDto> ImportCsvAsync(
             string filePath,
-            IProgress<ImportProgress>? progress = null,
+            IProgress<ImportProgressDto>? progress = null,
             CancellationToken cancellationToken = default)
         {
-            var result = new ImportResult { StartTime = DateTime.Now };
-            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            var result = new ImportResultDto { StartTime = DateTime.Now };
+            File fileRecord = null;
+            //  await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
             try
             {
                 // Validate file existence early
@@ -42,47 +43,77 @@ namespace QualityControl.WPF.Services
                 var fileName = Path.GetFileName(filePath);
 
                 // Step 1: Create/validate file record (separate transaction)
-                var fileRecord = await CreateAndValidateFileRecordAsync(filePath, fileName, progress, transaction, cancellationToken);
+                fileRecord = await CreateAndValidateFileRecordAsync(filePath, fileName, progress, cancellationToken);
 
-                // Step 2: Single-pass processing with streaming
-                var (recordCount, importedCount) = await ProcessCsvWithStreamingAsync(
-                    filePath,
-                    fileRecord,
-                    fileName,
-                    progress,
-                    transaction,
-                    cancellationToken);
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-                // Step 3: Update file completion time (separate small transaction)
-                await UpdateFileCompletionAsync(fileRecord.Id, transaction, cancellationToken);
-
-                await transaction.CommitAsync(cancellationToken);
-                result.Success = true;
-                result.TotalRecordsProcessed = recordCount;
-                result.RecordsImported = importedCount;
-                result.RecordsSkipped = 0;
-
-                progress?.Report(new ImportProgress
+                try
                 {
-                    FileName = fileName,
-                    CurrentRecord = importedCount,
-                    TotalRecords = recordCount,
-                    CurrentStatus = "Import completed successfully!"
-                });
+                    // Step 2: Single-pass processing with streaming
+                    var (recordCount, importedCount) = await ProcessCsvWithStreamingAsync(
+                        filePath,
+                        fileRecord,
+                        fileName,
+                        progress,
+                        transaction,
+                        cancellationToken);
+
+                    // Step 3: Update file completion time (separate small transaction)
+                //    await UpdateFileCompletionAsync(fileRecord.Id, recordCount, cancellationToken);
+
+                    
+                    result.Success = true;
+                    result.TotalRecordsProcessed = recordCount;
+                    result.RecordsImported = importedCount;
+                    result.RecordsSkipped = 0;
+
+
+                    await transaction.CommitAsync(cancellationToken);
+
+                    progress?.Report(new ImportProgressDto
+                    {
+                        FileName = fileName,
+                        CurrentRecord = importedCount,
+                        TotalRecords = recordCount,
+                        CurrentStatus = "Import completed successfully!"
+                    });
+                }
+                catch (OperationCanceledException)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "Import was cancelled by user.";
+                }
+                catch (FileAlreadyImportedException faie)
+                {
+                    result.RecordsImported = 0;
+                    result.RecordsSkipped = 0;
+                    result.TotalRecordsProcessed = 0;
+                    result.Success = true;
+                    result.ErrorMessage = faie.Message;
+                }
+                catch (Exception ex)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = ex.InnerException?.Message ?? ex.Message;
+                }
+                //finally
+                //{
+                //    result.EndTime = DateTime.Now;
+                //}
             }
-            catch (OperationCanceledException)
-            {
-                result.Success = false;
-                result.ErrorMessage = "Import was cancelled by user.";
-            }
-            catch (FileAlreadyImportedException faie)
-            {
-                result.RecordsImported = 0;
-                result.RecordsSkipped = 0;
-                result.TotalRecordsProcessed = 0;
-                result.Success = true;
-                result.ErrorMessage = faie.Message;
-            }
+            //catch (OperationCanceledException)
+            //{
+            //    result.Success = false;
+            //    result.ErrorMessage = "Import was cancelled by user.";
+            //}
+            //catch (FileAlreadyImportedException faie)
+            //{
+            //    result.RecordsImported = 0;
+            //    result.RecordsSkipped = 0;
+            //    result.TotalRecordsProcessed = 0;
+            //    result.Success = true;
+            //    result.ErrorMessage = faie.Message;
+            //}
             catch (Exception ex)
             {
                 result.Success = false;
@@ -91,6 +122,9 @@ namespace QualityControl.WPF.Services
             finally
             {
                 result.EndTime = DateTime.Now;
+                // Step 3: Update file completion time (separate small transaction)
+                if (fileRecord != null)
+                    await UpdateFileCompletionAsync(fileRecord.Id, result.RecordsImported, result.ErrorMessage, cancellationToken);
             }
 
             return result;
@@ -103,7 +137,7 @@ namespace QualityControl.WPF.Services
             string filePath,
             File fileRecord,
             string fileName,
-            IProgress<ImportProgress>? progress,
+            IProgress<ImportProgressDto>? progress,
             IDbContextTransaction transaction,
             CancellationToken cancellationToken)
         {
@@ -119,7 +153,7 @@ namespace QualityControl.WPF.Services
                 TrimOptions = TrimOptions.Trim
             };
 
-            progress?.Report(new ImportProgress
+            progress?.Report(new ImportProgressDto
             {
                 FileName = fileName,
                 CurrentRecord = 0,
@@ -140,6 +174,7 @@ namespace QualityControl.WPF.Services
             }))
             using (var csv = new CsvReader(reader, config))
             {
+                csv.Context.RegisterClassMap<DataSetMap>();
                 var records = csv.GetRecordsAsync<DataSetCsvRecord>(cancellationToken);
 
                 await foreach (var record in records.WithCancellation(cancellationToken))
@@ -161,7 +196,7 @@ namespace QualityControl.WPF.Services
                     // Report progress periodically
                     if (recordCount % 10000 == 0)
                     {
-                        progress?.Report(new ImportProgress
+                        progress?.Report(new ImportProgressDto
                         {
                             FileName = fileName,
                             CurrentRecord = recordCount,
@@ -172,7 +207,7 @@ namespace QualityControl.WPF.Services
                 }
             }
 
-            progress?.Report(new ImportProgress
+            progress?.Report(new ImportProgressDto
             {
                 FileName = fileName,
                 CurrentRecord = recordCount,
@@ -186,7 +221,7 @@ namespace QualityControl.WPF.Services
             // Clear collector to free memory
             lookupCollector.Clear();
 
-            progress?.Report(new ImportProgress
+            progress?.Report(new ImportProgressDto
             {
                 FileName = fileName,
                 CurrentRecord = 0,
@@ -236,7 +271,7 @@ namespace QualityControl.WPF.Services
                         dataBatch.Clear();
 
                         // Report progress
-                        progress?.Report(new ImportProgress
+                        progress?.Report(new ImportProgressDto
                         {
                             FileName = fileName,
                             CurrentRecord = importedCount,
@@ -502,11 +537,10 @@ namespace QualityControl.WPF.Services
         private async Task<File> CreateAndValidateFileRecordAsync(
             string filePath,
             string fileName,
-            IProgress<ImportProgress>? progress,
-            IDbContextTransaction transaction,
+            IProgress<ImportProgressDto>? progress,
             CancellationToken cancellationToken)
         {
-         //   await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+           // await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
             try
             {
@@ -527,12 +561,11 @@ namespace QualityControl.WPF.Services
                 }
 
                 // Handle file with same name but different hash
-                existingFile = await _context.Files
-                    .FirstOrDefaultAsync(f => f.Name == fileName && f.Hash != hash, cancellationToken);
+                existingFile = await _context.Files.FirstOrDefaultAsync(f => f.Name == fileName && f.Hash != hash, cancellationToken);
 
                 if (existingFile != null)
                 {
-                    progress?.Report(new ImportProgress
+                    progress?.Report(new ImportProgressDto
                     {
                         FileName = fileName,
                         CurrentRecord = 0,
@@ -543,12 +576,13 @@ namespace QualityControl.WPF.Services
                     await _context.DataSets
                         .Where(d => d.File_Id == existingFile.Id)
                         .ExecuteDeleteAsync(cancellationToken);
+                    await _context.SaveChangesAsync(cancellationToken);
 
                     _context.Files.Remove(existingFile);
                     await _context.SaveChangesAsync(cancellationToken);
                 }
 
-                progress?.Report(new ImportProgress
+                progress?.Report(new ImportProgressDto
                 {
                     FileName = fileName,
                     CurrentRecord = 0,
@@ -582,15 +616,16 @@ namespace QualityControl.WPF.Services
                 }
 
                 _context.Files.Add(fileRecord);
-                await _context.SaveChangesAsync(cancellationToken);
-              //  await transaction.CommitAsync(cancellationToken);
 
                 return fileRecord;
             }
             catch
             {
-                await transaction.RollbackAsync(cancellationToken);
                 throw;
+            }
+            finally
+            {
+                await _context.SaveChangesAsync(cancellationToken);
             }
         }
 
@@ -699,7 +734,7 @@ namespace QualityControl.WPF.Services
         /// <summary>
         /// Update file completion timestamp using ExecuteUpdate (no entity tracking)
         /// </summary>
-        private async Task UpdateFileCompletionAsync(int fileId, IDbContextTransaction transaction, CancellationToken cancellationToken)
+        private async Task UpdateFileCompletionAsync(int fileId, int totalRecordsProcessed, string errorMessage, CancellationToken cancellationToken)
         {
           //  await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
@@ -707,13 +742,15 @@ namespace QualityControl.WPF.Services
             {
                 await _context.Files
                     .Where(f => f.Id == fileId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(f => f.EndImportAt, DateTime.Now), cancellationToken);
+                    .ExecuteUpdateAsync(s => s.SetProperty(f => f.EndImportAt, DateTime.Now)
+                                              .SetProperty(f => f.NumberOfRecords, totalRecordsProcessed)
+                                              .SetProperty(f => f.ErrorMessage, errorMessage), cancellationToken);
 
-              //  await transaction.CommitAsync(cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
             }
             catch
             {
-                await transaction.RollbackAsync(cancellationToken);
+               // await transaction.RollbackAsync(cancellationToken);
                 throw;
             }
         }

@@ -42,7 +42,7 @@ namespace QualityControl.WPF.Messenger
                     "WebViewMessenger must be initialized with a WebView2 instance before receiving messages.");
             }
 
-            var message = JsonSerializer.Deserialize<WebMessage>(json, _options);
+            var message = JsonSerializer.Deserialize<WebMessageDto>(json, _options);
 
             if (message == null)
                 return;
@@ -57,7 +57,7 @@ namespace QualityControl.WPF.Messenger
 
         public void Publish(TypeEnum type, object? payload, string name = "", string? correlationId = null)
         {
-            var webMessage = new WebMessage
+            var webMessage = new WebMessageDto
             {
                 Type = type,
                 CorrelationId = correlationId,

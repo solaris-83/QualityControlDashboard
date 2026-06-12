@@ -40,7 +40,6 @@ namespace QualityControl.WPF
                 options.UseSqlite($"Data Source={dbPath}"));
 
             // Services
-            services.AddScoped<IUserService, UserService>();
             services.AddTransient<IDataSetService, DataSetService>();
             services.AddTransient<ICsvImportService, CsvImportService>();
             

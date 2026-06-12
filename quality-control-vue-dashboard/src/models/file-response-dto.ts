@@ -9,5 +9,7 @@ export class FileResponseDto {
     year: number;
     name: string;
     startImportedAt: Date;
-    endImportedAt: Date;
+    endImportedAt: Date | null;
+    numberOfRecords: number;
+    errorMessage: string | null;
 }
