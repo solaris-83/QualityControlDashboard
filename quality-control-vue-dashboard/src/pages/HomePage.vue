@@ -39,6 +39,7 @@ button {
   padding: 0.7rem 1rem;
   border: 1px solid #1f6feb;
   background-color: #1f6feb;
+  font-size: 17px;
   color: #fff;
   border-radius: 8px;
   cursor: pointer;

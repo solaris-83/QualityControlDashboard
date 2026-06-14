@@ -143,6 +143,7 @@ input {
 button {
   padding: 0.6rem 0.95rem;
   border-radius: 8px;
+  font-size: 17px;
   border: 1px solid #1f6feb;
   background-color: #1f6feb;
   color: #fff;
@@ -152,6 +153,7 @@ button {
 button.secondary {
   border-color: #a2a2a2;
   background-color: #fff;
+  font-size: 17px;
   color: #333;
 }
 

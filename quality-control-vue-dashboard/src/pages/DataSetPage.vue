@@ -107,11 +107,13 @@ button {
   background-color: #1f6feb;
   color: #fff;
   cursor: pointer;
+  font-size: 17px;
 }
 
 button.secondary {
   border-color: #a2a2a2;
   background-color: #fff;
+  font-size: 17px;
   color: #333;
 }
 
