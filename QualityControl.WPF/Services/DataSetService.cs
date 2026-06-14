@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using QualityControl.WPF.DB;
 using QualityControl.WPF.Models;
+using System.Runtime.CompilerServices;
 
 namespace QualityControl.WPF.Services
 {
@@ -8,7 +9,7 @@ namespace QualityControl.WPF.Services
     {
         private readonly AppDbContext _context = context;
 
-        public async IAsyncEnumerable<DataSetResponseDto> GetAsync(DataSetRequestDto requestDto, CancellationToken cancellationToken)
+        public async IAsyncEnumerable<DataSetResponseDto> GetAsync(DataSetRequestDto requestDto, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             await foreach (var row in _context.DataSets
                 .Where(d => d.File.Week == requestDto.Week && d.File.Year == requestDto.Year)

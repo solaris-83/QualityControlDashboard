@@ -14,5 +14,5 @@ export class DataSetResponseDto {
     resultType: string = "";
     errorCode: string | null;
     elapsedTime: number | null;
-    affectedControllers: string = "";
+    affectedControllers: string | null;
 }

@@ -76,10 +76,13 @@ namespace QualityControl.WPF.Services
                 }
                 catch (OperationCanceledException)
                 {
+                    result.RecordsImported = 0;
+                    result.RecordsSkipped = 0;
+                    result.TotalRecordsProcessed = 0;
                     result.Success = false;
                     result.ErrorMessage = "Import was cancelled by user.";
                 }
-                catch (FileAlreadyImportedException faie)
+                catch (AlreadyImportedFileApplicationException faie)
                 {
                     result.RecordsImported = 0;
                     result.RecordsSkipped = 0;
@@ -89,6 +92,9 @@ namespace QualityControl.WPF.Services
                 }
                 catch (Exception ex)
                 {
+                    result.RecordsImported = 0;
+                    result.RecordsSkipped = 0;
+                    result.TotalRecordsProcessed = 0;
                     result.Success = false;
                     result.ErrorMessage = ex.InnerException?.Message ?? ex.Message;
                 }
@@ -547,7 +553,7 @@ namespace QualityControl.WPF.Services
 
                 if (existingFile != null)
                 {
-                    throw new FileAlreadyImportedException(
+                    throw new AlreadyImportedFileApplicationException(
                         $"File '{fileName}' has already been imported successfully. " +
                         "To re-import, please delete the existing file record first.");
                 }

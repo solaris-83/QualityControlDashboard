@@ -26,6 +26,7 @@ namespace QualityControl.WPF.Models
         public string? ErrorCode { get; set; }
         [TsNull]
         public int? ElapsedTime { get; set; }
-        public string AffectedControllers { get; set; } = "";
+        [TsNull]
+        public string? AffectedControllers { get; set; }
     }
 }

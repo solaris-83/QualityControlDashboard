@@ -10,6 +10,6 @@ namespace QualityControl.WPF.Messenger
         void RegisterHandler<TRequest, TResponse>(string messageType, Func<TRequest?, Task<TResponse>> handler);
 
         Task ReceiveMessageAsync(string json);
-        void Publish(TypeEnum type, object? payload, string name = "", string? correlationId = null);
+        void Publish(TypeEnum type, object? payload, bool isError, string name = "", string? correlationId = null);
     }
 }

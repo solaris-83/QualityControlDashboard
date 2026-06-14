@@ -6,9 +6,10 @@
 import { TypeEnum } from "./type-enum";
 
 export class WebMessageDto {
-    id: string = "8795d428-de0e-49d4-b653-1207c0cd0f5c";
+    id: string = "55a979a6-9486-4f2c-abd7-a960c2aead2d";
     type: TypeEnum;
     payload: Object;
     name: string;
+    isError: boolean;
     correlationId: string | null;
 }

@@ -19,6 +19,9 @@ namespace QualityControl.WPF.Models
         [JsonPropertyName("name")]
         public string Name { get; set; }
 
+        [JsonPropertyName("isError")]
+        public bool IsError { get; set; } = false;
+
         [JsonPropertyName("correlationId")]
         [TsNull]
         public string? CorrelationId { get; set; }
@@ -48,6 +51,6 @@ namespace QualityControl.WPF.Models
         [TsStatic]
         public static string Files_Upload_Progress = "files.upload.progress";
         [TsStatic]
-        public static int ImportFileMaxTimeoutSeconds = 180; // 3 minutes
+        public static int ImportFileMaxTimeoutSeconds = 180; // 3 minutes  // TODO Rimuovere per gestire il timeout lato server
     }
 }

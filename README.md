@@ -263,6 +263,42 @@ await _csvImportService.ImportCsvAsync(filePath, progress, cancellationToken);
 
 ## Running the application
 
+### Debug
+* Enable sourcemap in vite.config.js
+
+```js
+{
+   build: {
+    sourcemap: true
+  }
+}
+```
+* Configure launch.json properly
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "msedge",
+            "request": "attach",
+            "name": "Attach to WebView2",
+            "port": 9222,
+            "webRoot": "${workspaceFolder}/src"
+        }
+    ]
+}
+```
+* Set breakpoints on Vue app
+* Start WPF app
+* Page http://localhost:9222/json should be reachable
+* Execute 
+    ```bash
+    npm run dev
+    ```
+* Attach to WebView2
+* For next times it is enough to press F5.
+
 ### Development
 
 ```bash
@@ -290,12 +326,15 @@ npm run build
 
 ### Regenerating TypeScript DTOs
 
+In Package Manager Console
 ```bash
-cd QualityControl.WPF
-typegen.bat          # runs: typegen generate
+PM > cd QualityControl.WPF     
+PM > typegen generate          
 # Outputs auto-generated .ts files to ../quality-control-vue-dashboard/src/models/
 ```
+### EF Core Migrations
 
+TBC
 ---
 
 ## Technology stack

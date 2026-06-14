@@ -28,6 +28,7 @@
         <button type="button" :disabled="loading" @click="loadFiles">Load</button>
         <button type="button" :disabled="uploading" @click="importCsv">Import New CSV</button>
         <button type="button" :disabled="selectedFileIds.length === 0" @click="deleteSelected">Delete</button>
+        <button type="button" class="tertiary" :style="{ opacity: isStopEnabled ? 1 : 0.4 }" :disabled="!isStopEnabled" @click="handleStop">Stop</button>
       </div>
     </div>
 
@@ -41,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import FileResponseTable from '../components/FileResponseTable.vue';
 import { useImportFiles } from '../composables/useImportFiles.ts';
 import { FileRequestDto } from '../models/file-request-dto';
@@ -51,19 +52,31 @@ defineEmits<{
   (e: 'go-home'): void;
 }>();
 
-const { uploadFile, loading, uploading, dataSetInfo, dataSetRows, dataSetError, loadImportedFiles, deleteImportedFiles } = useImportFiles();
+const { uploadFile, loading, uploading, deleting, dataSetInfo, dataSetRows, dataSetError, loadImportedFiles, deleteImportedFiles } = useImportFiles();
 
 const now = new Date();
 const week = ref(getISOWeek(now));
 const year = ref(now.getFullYear());
 const projectsText = ref('BUS_ADAS,TRUCK_L24,TRUCK_MH24');
-//const isDeleteEnabled = ref(false);
 const selectedFileIds = ref<number[]>([]);
 
 const handleSelectedRowsUpdate = (selectedIds: number[]) => {
   //isDeleteEnabled.value = selectedIds.length > 0;
   selectedFileIds.value = selectedIds;
   console.log('Selected file IDs from table:', selectedIds);
+};
+
+const handleStop = () => {
+  if (uploading.value) {
+    console.log('Stopping upload...');
+    // Implement logic to stop the upload process
+  } else if (loading.value) {
+    console.log('Stopping loading...');
+    // Implement logic to stop the loading process
+  } else if (deleting.value) {
+    console.log('Stopping deletion...');
+    // Implement logic to stop the deletion process
+  }
 };
 
 onMounted(async() => {
@@ -73,6 +86,8 @@ onMounted(async() => {
 async function loadFiles() {
   await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
 }
+
+const isStopEnabled = computed(() => uploading.value || loading.value || deleting.value);
 
 async function importCsv() {
   const request = new FileRequestDto();
@@ -155,6 +170,14 @@ button.secondary {
   background-color: #fff;
   font-size: 17px;
   color: #333;
+}
+
+button.tertiary {
+  border-color: #da4141;
+  background-color: #da4141;
+  margin-left: auto;
+  font-size: 17px;
+  color: #fff;
 }
 
 button:disabled {

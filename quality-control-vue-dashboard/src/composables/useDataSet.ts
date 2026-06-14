@@ -5,6 +5,7 @@ import { DataSetRequestDto } from "../models/data-set-request-dto";
 import { StreamSubscription } from "../models/streamSubscription";
 import { Constants } from "../models/constants";
 import { logError, logInfo, logSuccess } from "../miscellanea/log";
+import { ErrorDto } from "../models/error-dto";
 
 export function useDataSet() {
   const loading = ref(false);
@@ -35,11 +36,6 @@ export function useDataSet() {
         dataSetRows.value = [...dataSetRows.value, ...chunk];
         dataSetInfo.value = `Received data set chunk: ${chunk.length} records (Chunk Index: ${chunkIndex})`;
         logInfo(dataSetInfo.value)
-       /* chunk.forEach((dto: DataSetResponseDto) => {
-          logInfo(
-            `DataSet - ID: ${dto.id}, Week: ${dto.week}, Year: ${dto.year}, License: ${dto.license}, VIN: ${dto.vin}, Model: ${dto.model}, AppName: ${dto.appName}, ElapsedTime: ${dto.elapsedTime}, AffectedControllers: ${dto.affectedControllers}, ResultType: ${dto.resultType}, ErrorCode: ${dto.errorCode}`,
-          );
-        });*/
       },
       completed: () => {
         dataSetError.value = null;
@@ -48,18 +44,35 @@ export function useDataSet() {
         loading.value = false;
       },
       error: (err: any) => {
-        logError("Data set stream error: " + err);
-        dataSetInfo.value = null;
-        dataSetError.value = err instanceof Error ? err.message : String(err);
-        loading.value = false;
+        const errorMessage = err as ErrorDto;
+        if (errorMessage && errorMessage.message) {
+          dataSetError.value = errorMessage.message;
+          dataSetInfo.value = null;
+          logError("Data set stream error: " + errorMessage.message);
+        } else {
+          const errorMessage = "Failed to load data set.";
+          dataSetError.value = errorMessage;
+          dataSetInfo.value = null;
+          logError("Data set stream error: " + errorMessage);
+        }
       },
     };
 
     try {
       bus.subscribeStream<DataSetResponseDto>(subscriptionData, req);
-    } catch (err) {
-      dataSetInfo.value = null;
-      dataSetError.value = err instanceof Error ? err.message : "Failed to load dataset.";
+    } 
+    catch (err) {
+      const errorMessage = err as ErrorDto;
+      if (errorMessage && errorMessage.message) {
+        dataSetError.value = errorMessage.message;
+        dataSetInfo.value = null;
+        logError("Data set stream error: " + errorMessage.message);
+      } else {
+        const errorMessage = "Failed to load data set.";
+        dataSetError.value = errorMessage;
+        dataSetInfo.value = null;
+        logError("Data set stream error: " + errorMessage);
+      }
       loading.value = false;
     }
   }

@@ -6,6 +6,7 @@ import { ImportResultDto } from "../models/import-result-dto";
 import { ImportProgressDto } from "../models/import-progress-dto";
 import { FileResponseDto } from "../models/file-response-dto";
 import { Constants } from "../models/constants";
+import { ErrorDto } from "../models/error-dto";
 
 export function useImportFiles() {
   const loading = ref(false);
@@ -19,8 +20,7 @@ export function useImportFiles() {
 
   // Function to load imported files based on week, year, and projects
   // Sends a request to the backend (bus.request), waits for a response and updates the state with the retrieved file information
-  async function loadImportedFiles(week: number, year: number, projects: string[],
-  ) {
+  async function loadImportedFiles(week: number, year: number, projects: string[]) {
     dataSetInfo.value = "Starting to load imported files...";
     dataSetError.value = null;
     dataSetRows.value = [];
@@ -32,20 +32,26 @@ export function useImportFiles() {
       fileRequest.year = year;
       fileRequest.projects = projects;
 
-      const results: FileResponseDto[] = await bus.request(
-        Constants.files_Get,
-        fileRequest,
+      const results: FileResponseDto[] = await bus.request(Constants.files_Get, fileRequest,
       );
       dataSetRows.value = [...dataSetRows.value, ...results];
       dataSetInfo.value = `Number of files retrieved: ${results.length}`;
       logSuccess(dataSetInfo.value);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to load imported files.";
-      dataSetError.value = errorMessage;
-      dataSetInfo.value = null;
-      logError("Error loading imported files: " + errorMessage);
-    } finally {
+    }
+    catch (err) {
+      const errorMessage = err as ErrorDto;
+      if (errorMessage && errorMessage.message) {
+        dataSetError.value = errorMessage.message;
+        dataSetInfo.value = null;
+        logError("Error loading imported files: " + errorMessage.message);
+      } else {
+        const errorMessage = "Failed to load imported files.";
+        dataSetError.value = errorMessage;
+        dataSetInfo.value = null;
+        logError("Error loading imported files: " + errorMessage);
+      }
+    }
+    finally {
       loading.value = false;
     }
   }
@@ -58,28 +64,33 @@ export function useImportFiles() {
     deleting.value = true;
 
     try {
-      
-
       const results: FileResponseDto[] = await bus.request(
         Constants.files_Delete,
         fileIds,
       );
-     // dataSetRows.value = [...dataSetRows.value, ...results];
       dataSetInfo.value = `Number of files deleted: ${results.length}`;
       logSuccess(dataSetInfo.value);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to delete imported files and correlated rows.";
-      dataSetError.value = errorMessage;
-      dataSetInfo.value = null;
-      logError("Error deleting imported files: " + errorMessage);
-    } finally {
+    }
+    catch (err) {
+      const errorMessage = err as ErrorDto;
+      if (errorMessage && errorMessage.message) {
+        dataSetError.value = errorMessage.message;
+        dataSetInfo.value = null;
+        logError("Failed to delete imported files and correlated rows: " + errorMessage.message);
+      } else {
+        const errorMessage = "Failed to delete imported files and correlated rows.";
+        dataSetError.value = errorMessage;
+        dataSetInfo.value = null;
+        logError("Failed to delete imported files and correlated rows: " + errorMessage);
+      }
+    }
+    finally {
       deleting.value = false;
     }
   }
 
   // Function to upload a file based on the provided file request information
-  // Subscribes to upload progress updates (bus.subscribe<ImportProgressDto>) and sends an upload request to the backend (bus.request)
+  // Sends an upload request to the backend (bus.request) and subscribes to upload progress updates (bus.subscribe<ImportProgressDto>)
   async function uploadFile(fileRequest: FileRequestDto) {
     uploading.value = true;
     dataSetInfo.value = "Starting file upload...";
@@ -111,12 +122,21 @@ export function useImportFiles() {
             )
             .join("\n"),
       );*/
-    } catch (err) {
-      dataSetInfo.value = null;
-      dataSetError.value =
-        err instanceof Error ? err.message : "Failed to load dataset.";
-      loading.value = false;
-    } finally {
+    } 
+    catch (err) {
+      const errorMessage = err as ErrorDto;
+      if (errorMessage && errorMessage.message) {
+        dataSetError.value = errorMessage.message;
+        dataSetInfo.value = null;
+        logError("Failed to upload file: " + errorMessage.message);
+      } else {
+        const errorMessage = "Failed to upload file.";
+        dataSetError.value = errorMessage;
+        dataSetInfo.value = null;
+        logError("Failed to upload file: " + errorMessage);
+      }
+    } 
+    finally {
       uploading.value = false;
     }
   }
@@ -124,6 +144,7 @@ export function useImportFiles() {
   return {
     loading,
     uploading,
+    deleting,
     errors,
     dataSetInfo,
     dataSetRows,

@@ -11,6 +11,8 @@
 </template>
 
 <script setup lang="ts">
+import { bus } from '../services/webviewMessenger';
+
 defineEmits<{
   (e: 'open-files'): void;
   (e: 'open-dataset'): void;

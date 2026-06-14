@@ -43,6 +43,7 @@ export class WebViewMessenger {
       type,
       payload,
       name: "",
+      isError: false,
       correlationId: "",
     };
 
@@ -74,6 +75,7 @@ export class WebViewMessenger {
         type: TypeEnum.Request,
         payload,
         name,
+        isError: false,
         correlationId: "",
       };
 
@@ -118,6 +120,7 @@ export class WebViewMessenger {
       type: TypeEnum.Stream,
       name: subscription.streamId,
       correlationId: "",
+      isError: false,
       payload: payload,
     };
 
@@ -161,9 +164,14 @@ export class WebViewMessenger {
 
     clearTimeout(request.timeoutHandle);
 
-    request.resolve(message.payload);
-
     this.pendingRequests.delete(message.correlationId!);
+
+    if (message.isError) {
+      request.reject(message.payload);
+      return;
+    }
+
+    request.resolve(message.payload);
   }
 
   private handleEvent(message: WebMessageDto): void {

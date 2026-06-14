@@ -1,4 +1,5 @@
 ﻿using Microsoft.Web.WebView2.Wpf;
+using QualityControl.WPF.Exceptions;
 using QualityControl.WPF.Models;
 using System;
 using System.Collections.Concurrent;
@@ -38,8 +39,7 @@ namespace QualityControl.WPF.Messenger
         {
             if (_webView?.CoreWebView2 == null)
             {
-                throw new InvalidOperationException(
-                    "WebViewMessenger must be initialized with a WebView2 instance before receiving messages.");
+                throw new InvalidOperationException("WebViewMessenger must be initialized with a WebView2 instance before receiving messages.");
             }
 
             var message = JsonSerializer.Deserialize<WebMessageDto>(json, _options);
@@ -50,17 +50,34 @@ namespace QualityControl.WPF.Messenger
             if (!_handlers.TryGetValue(message.Name, out var handler))
                 return;
 
-            var response = await handler(message.Payload);
+            object? response = null;
+            bool isError = false;
+            try
+            {
+               response = await handler(message.Payload);
+            }
+            catch (ApplicationBaseException ex)
+            {
+                isError = true;
+                response = new ErrorDto(ex.Message, ex.StackTrace, message.Id);
+            }
+            catch (Exception ex)
+            {
+                isError = true;
+                response = new ErrorDto("An unexpected error occurred.", ex.StackTrace, message.Id);
+                Console.Error.WriteLine($"Error handling message '{message.Name}': {ex}");
+            }
 
-            Publish(message.Type, response, message.Name, message.Id); 
+            Publish(message.Type, response, isError, message.Name, message.Id); 
         }
 
-        public void Publish(TypeEnum type, object? payload, string name = "", string? correlationId = null)
+        public void Publish(TypeEnum type, object? payload, bool isError, string name = "", string? correlationId = null)
         {
             var webMessage = new WebMessageDto
             {
                 Type = type,
                 CorrelationId = correlationId,
+                IsError = isError,
                 Name = name,
                 Payload = payload
             };

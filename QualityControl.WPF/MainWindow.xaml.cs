@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using QualityControl.WPF.DB;
+using QualityControl.WPF.Exceptions;
 using QualityControl.WPF.Messenger;
 using QualityControl.WPF.Models;
 using QualityControl.WPF.Services;
@@ -42,9 +43,7 @@ namespace QualityControl.WPF
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
-            Environment.SetEnvironmentVariable(
-    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-    "--remote-debugging-port=9222");
+            Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--remote-debugging-port=9222");
             await Browser.EnsureCoreWebView2Async();
 
             // Initialize the messenger with the WebView2 control
@@ -69,59 +68,57 @@ namespace QualityControl.WPF
             // Browser.Source = new Uri(distIndexPath);
         }
 
-        // Fare classe statica fuori da MainWindow??
         private void RegisterHandlers()
         {
-            //_messenger.RegisterHandler<UserRequest, UserDto>(
-            //    "user.get", 
-            //    async request =>
-            //    {
-            //        return await _userService.GetUserAsync(request!.Id);
-            //    });
-
-            //_messenger.RegisterHandler<UserDto, bool>(
-            //    "user.save", 
-            //    async user =>
-            //    {
-            //        await _userService.SaveUserAsync(user!);
-            //        return true;
-            //    });
-
             _messenger.RegisterHandler<DataSetRequestDto, StreamChunkDto<DataSetResponseDto>>(Constants.Dataset_Get, async request =>
             {
                 var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 int chunkSize = 100; // Define the size of each chunk
                 int chunkNumber = 0;
                 var chunk = new List<DataSetResponseDto>();
-                
-                await foreach (var item in _dataSetService.GetAsync(request, cancellationTokenSource.Token))
+
+                try
                 {
-                    chunk.Add(item);
-                    
-                    if (chunk.Count >= chunkSize)
+                    await foreach (var item in _dataSetService.GetAsync(request, cancellationTokenSource.Token))
                     {
-                        var intermediateChunk = new StreamChunkDto<DataSetResponseDto>(Constants.Dataset_Get, chunkNumber, chunk, isLastChunk: false);
-                        _messenger.Publish(TypeEnum.Stream, intermediateChunk, Constants.Dataset_Get, correlationId: "");
-                        chunkNumber++;
-                        chunk.Clear();
+                        chunk.Add(item);
+
+                        if (chunk.Count >= chunkSize)
+                        {
+                            var intermediateChunk = new StreamChunkDto<DataSetResponseDto>(Constants.Dataset_Get, chunkNumber, chunk, isLastChunk: false);
+                            _messenger.Publish(TypeEnum.Stream, intermediateChunk, isError: false, name: Constants.Dataset_Get, correlationId: "");
+                            chunkNumber++;
+                            chunk.Clear();
+                        }
                     }
+
+                    // Send the final chunk with any remaining items
+                    var finalChunk = new StreamChunkDto<DataSetResponseDto>(Constants.Dataset_Get, chunkNumber, chunk, isLastChunk: true);
+                    return finalChunk;
                 }
-                
-                // Send the final chunk with any remaining items
-                var finalChunk = new StreamChunkDto<DataSetResponseDto>(Constants.Dataset_Get, chunkNumber, chunk, isLastChunk: true);
-                return finalChunk;
+                catch (Exception ex)
+                {
+                    throw new DatabaseApplicationException(ex.Message);
+                }
             });
 
             _messenger.RegisterHandler<List<int>, bool>(Constants.Files_Delete,
                 async request => // TODO gestire eccezione e rollback
                 {
                     await using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        await _context.DataSets.Where(ds => request.Contains(ds.File_Id)).ExecuteDeleteAsync();
+                        await _context.Files.Where(f => request.Contains(f.Id)).ExecuteDeleteAsync();
 
-                    await _context.DataSets.Where(ds => request.Contains(ds.File_Id)).ExecuteDeleteAsync();
-                    await _context.Files.Where(f => request.Contains(f.Id)).ExecuteDeleteAsync(); // TODO lato TS quando si cancellano le righe la selezione delle checkbox rimane e si desincronizza
-
-                    await transaction.CommitAsync();
-                    return true;
+                        await transaction.CommitAsync();
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync();
+                        throw new DatabaseApplicationException(ex.Message);
+                    }
                 }
             );
 
@@ -133,78 +130,100 @@ namespace QualityControl.WPF
                         return [];
                     }
 
-                    var query = _context.Files.AsQueryable();
-
-                    // Filter by year (always applied)
-                    query = query.Where(f => f.Year == request.Year);
-
-                    // Filter by week if specified
-                    if (request.Week != 0)
+                    try
                     {
-                        query = query.Where(f => f.Week == request.Week);
+                        var query = _context.Files.AsQueryable();
+
+                        // Filter by year (always applied)
+                        query = query.Where(f => f.Year == request.Year);
+
+                        // Filter by week if specified
+                        if (request.Week != 0)
+                        {
+                            query = query.Where(f => f.Week == request.Week);
+                        }
+
+                        // Filter by projects if specified
+                        if (request.Projects != null && request.Projects.Count > 0)
+                        {
+                            query = query.Where(f => request.Projects.Contains(f.Project.Name));
+                        }
+
+                        return await query.Select(f => new FileResponseDto
+                        {
+                            Id = f.Id,
+                            Week = f.Week,
+                            Year = f.Year,
+                            Name = f.Name,
+                            StartImportedAt = f.StartImportAt,
+                            EndImportedAt = f.EndImportAt,
+                            NumberOfRecords = f.NumberOfRecords,
+                            ErrorMessage = f.ErrorMessage
+                        }).ToListAsync();
                     }
-
-                    // Filter by projects if specified
-                    if (request.Projects != null && request.Projects.Count > 0)
+                    catch (Exception ex)
                     {
-                        query = query.Where(f => request.Projects.Contains(f.Project.Name));
+                        throw new DatabaseApplicationException(ex.Message);
                     }
-
-                    return await query.Select(f => new FileResponseDto
-                    {
-                        Id = f.Id,
-                        Week = f.Week,
-                        Year = f.Year,
-                        Name = f.Name,
-                        StartImportedAt = f.StartImportAt,
-                        EndImportedAt = f.EndImportAt, 
-                        NumberOfRecords = f.NumberOfRecords,
-                        ErrorMessage = f.ErrorMessage
-                    }).ToListAsync();
-            });
+                });
 
             _messenger.RegisterHandler<FileRequestDto, List<ImportResultDto>>(
                 Constants.Files_Upload, 
                 async request => // TODO Mettere nel handler un pattern che se va in errore la lambda expression allora notifica a TS
                 {
                     List<ImportResultDto> importResults = [];
-                    using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(Constants.ImportFileMaxTimeoutSeconds)); // TODO gestire bene la cancellazione lato TS, altrimenti se il processo dura più di 30 secondi allora TS non riceve nulla e va in timeout
-                    ct.Token.ThrowIfCancellationRequested(); // TODO set catch exception
-
-                    Progress<ImportProgressDto> progress = new(i =>
+                    try
                     {
-                        _messenger.Publish(TypeEnum.Event, i, Constants.Files_Upload_Progress);
-                    });
+                        using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(Constants.ImportFileMaxTimeoutSeconds)); // TODO gestire bene la cancellazione lato TS, altrimenti se il processo dura più di 30 secondi allora TS non riceve nulla e va in timeout
+                        ct.Token.ThrowIfCancellationRequested(); // TODO set catch exception
 
-                    ImportResultDto importResult = default;
-                    DirectoryInfo[] dirs = default;
-
-                    if (request.Week == 0)
-                    {
-                        DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @$"QualityControl\{request.Year}"));
-                        dirs = directoryInfo.GetDirectories();
-                    }
-                    else
-                    {
-                        DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @$"QualityControl\{request.Year}\wk{request.Week}"));
-                        dirs = new[] { directoryInfo };
-                    }
-
-                    foreach (var dir in dirs)
-                    {
-                        if (!Directory.Exists(dir.FullName))
-                            continue; // TODO magari notificare
-
-                        foreach (var file in dir.GetFiles().Where(f => request.Projects.Any(project => f.Name.Contains(project))))
+                        Progress<ImportProgressDto> progress = new(i =>
                         {
-                            if (!ct.IsCancellationRequested)
+                            _messenger.Publish(TypeEnum.Event, i, isError: false, name: Constants.Files_Upload_Progress);
+                        });
+
+                        ImportResultDto importResult = default;
+                        DirectoryInfo[] dirs = default;
+
+                        if (request.Week == 0)
+                        {
+                            DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @$"QualityControl\{request.Year}"));
+                            dirs = directoryInfo.GetDirectories();
+                        }
+                        else
+                        {
+                            DirectoryInfo directoryInfo = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @$"QualityControl\{request.Year}\wk{request.Week}"));
+                            dirs = new[] { directoryInfo };
+                        }
+
+                        foreach (var dir in dirs)
+                        {
+                            if (!Directory.Exists(dir.FullName))
+                                continue; // TODO magari notificare
+
+                            foreach (var file in dir.GetFiles().Where(f => request.Projects.Any(project => f.Name.Contains(project))))
                             {
-                                importResult = await _csvImportService.ImportCsvAsync(file.FullName, progress, ct.Token);
-                                importResults.Add(importResult);
+                                if (!ct.IsCancellationRequested)
+                                {
+                                    importResult = await _csvImportService.ImportCsvAsync(file.FullName, progress, ct.Token);
+                                    importResults.Add(importResult);
+                                }
                             }
                         }
+                        return importResults; // TODO non viene mappato errore c# verso il TS
                     }
-                    return importResults; // TODO non viene mappato errore c# verso il TS
+                    catch (DatabaseApplicationException)
+                    {
+                        throw; // Rethrow database exceptions without wrapping
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw new OperationCanceledApplicationException("The operation was canceled or timed out.");
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new ApplicationException($"Unexpected error during file import: {ex.Message}");
+                    }
                 });
         }
     }
