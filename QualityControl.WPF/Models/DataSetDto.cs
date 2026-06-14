@@ -23,7 +23,7 @@ namespace QualityControl.WPF.Models
         public string AppName { get; set; } = "";
         public string ResultType { get; set; } = "";
         [TsNull]
-        public int? ErrorCode { get; set; }
+        public string? ErrorCode { get; set; }
         [TsNull]
         public int? ElapsedTime { get; set; }
         public string AffectedControllers { get; set; } = "";

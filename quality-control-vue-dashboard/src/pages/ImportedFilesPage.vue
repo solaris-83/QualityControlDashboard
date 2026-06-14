@@ -27,6 +27,7 @@
       <div class="actions">
         <button type="button" :disabled="loading" @click="loadFiles">Load</button>
         <button type="button" :disabled="uploading" @click="importCsv">Import New CSV</button>
+        <button type="button" :disabled="selectedFileIds.length === 0" @click="deleteSelected">Delete</button>
       </div>
     </div>
 
@@ -35,7 +36,7 @@
     <p v-if="dataSetInfo">{{ dataSetInfo }}</p>
     <p v-if="dataSetError" class="error">{{ dataSetError }}</p>
 
-    <FileResponseTable :items="dataSetRows" />
+    <FileResponseTable :items="dataSetRows" @update:selected-rows="handleSelectedRowsUpdate" />
   </section>
 </template>
 
@@ -50,19 +51,26 @@ defineEmits<{
   (e: 'go-home'): void;
 }>();
 
-const { uploadFile, loading, uploading, dataSetInfo, dataSetRows, dataSetError, loadImportedFiles } = useImportFiles();
+const { uploadFile, loading, uploading, dataSetInfo, dataSetRows, dataSetError, loadImportedFiles, deleteImportedFiles } = useImportFiles();
 
 const now = new Date();
 const week = ref(getISOWeek(now));
 const year = ref(now.getFullYear());
 const projectsText = ref('BUS_ADAS,TRUCK_L24,TRUCK_MH24');
+//const isDeleteEnabled = ref(false);
+const selectedFileIds = ref<number[]>([]);
+
+const handleSelectedRowsUpdate = (selectedIds: number[]) => {
+  //isDeleteEnabled.value = selectedIds.length > 0;
+  selectedFileIds.value = selectedIds;
+  console.log('Selected file IDs from table:', selectedIds);
+};
 
 onMounted(() => {
   loadFiles();
 });
 
 async function loadFiles() {
-
   await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
 }
 
@@ -77,6 +85,11 @@ async function importCsv() {
 
   await uploadFile(request);
   await loadFiles();
+}
+
+async function deleteSelected() {
+  await deleteImportedFiles(selectedFileIds.value);
+  loadFiles();
 }
 </script>
 

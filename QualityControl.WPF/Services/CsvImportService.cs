@@ -18,12 +18,8 @@ namespace QualityControl.WPF.Services
     {
         private readonly AppDbContext _context = context;
         private const int BatchSize = 5000;
-        private const int LookupBatchSize = 1000;
 
-        public async Task<ImportResultDto> ImportCsvAsync(
-            string filePath,
-            IProgress<ImportProgressDto>? progress = null,
-            CancellationToken cancellationToken = default)
+        public async Task<ImportResultDto> ImportCsvAsync(string filePath, IProgress<ImportProgressDto>? progress = null, CancellationToken cancellationToken = default)
         {
             var result = new ImportResultDto { StartTime = DateTime.Now };
             File fileRecord = null;
@@ -534,11 +530,7 @@ namespace QualityControl.WPF.Services
         /// OPTIMIZED: Create file record with separate transaction
         /// Prevents long-running transactions that lock database resources
         /// </summary>
-        private async Task<File> CreateAndValidateFileRecordAsync(
-            string filePath,
-            string fileName,
-            IProgress<ImportProgressDto>? progress,
-            CancellationToken cancellationToken)
+        private async Task<File> CreateAndValidateFileRecordAsync(string filePath, string fileName, IProgress<ImportProgressDto>? progress, CancellationToken cancellationToken)
         {
            // await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
@@ -581,6 +573,8 @@ namespace QualityControl.WPF.Services
                     _context.Files.Remove(existingFile);
                     await _context.SaveChangesAsync(cancellationToken);
                 }
+
+                // TODO allow to reimport an already imported with error file
 
                 progress?.Report(new ImportProgressDto
                 {

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Xml.Linq;
 
@@ -111,7 +112,20 @@ namespace QualityControl.WPF
                 return finalChunk;
             });
 
-            _messenger.RegisterHandler<FileRequestDto, List<FileResponseDto>>(Constants.Files_Get,
+            _messenger.RegisterHandler<List<int>, bool>(Constants.Files_Delete,
+                async request => // TODO gestire eccezione e rollback
+                {
+                    await using var transaction = await _context.Database.BeginTransactionAsync();
+
+                    await _context.DataSets.Where(ds => request.Contains(ds.File_Id)).ExecuteDeleteAsync();
+                    await _context.Files.Where(f => request.Contains(f.Id)).ExecuteDeleteAsync(); // TODO lato TS quando si cancellano le righe la selezione delle checkbox rimane e si desincronizza
+
+                    await transaction.CommitAsync();
+                    return true;
+                }
+            );
+
+            _messenger.RegisterHandler<FileRequestDto, List<FileResponseDto>>(Constants.Files_Get, // TODO gestire l'oggetto di ritorno anche lato TS?
                 async request =>
                 {
                     if (request == null)
@@ -154,8 +168,7 @@ namespace QualityControl.WPF
                 async request => // TODO Mettere nel handler un pattern che se va in errore la lambda expression allora notifica a TS
                 {
                     List<ImportResultDto> importResults = [];
-                    using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(1800));
-                    //ct.CancelAfter(TimeSpan.FromSeconds(30));
+                    using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(Constants.ImportFileMaxTimeoutSeconds)); // TODO gestire bene la cancellazione lato TS, altrimenti se il processo dura più di 30 secondi allora TS non riceve nulla e va in timeout
                     ct.Token.ThrowIfCancellationRequested(); // TODO set catch exception
 
                     Progress<ImportProgressDto> progress = new(i =>

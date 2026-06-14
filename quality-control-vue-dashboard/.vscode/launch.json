@@ -1,15 +1,12 @@
 {
-
-   
-"configurations": [
+    "version": "0.2.0",
+    "configurations": [
         {
             "type": "msedge",
             "request": "attach",
-            "name": "Attach to WebView2 (WPF app)",
-            "address": "localhost",
-            "port": 5173,
-            "urlFilter": "*",
-            "webRoot": "C:\\DEV\\.NET\\QualityControlDashboard\\quality-control-vue-dashboard\\index.html"
+            "name": "Attach to WebView2",
+            "port": 9222,
+            "webRoot": "${workspaceFolder}/src"
         }
     ]
 }

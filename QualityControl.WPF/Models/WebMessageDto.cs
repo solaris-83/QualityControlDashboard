@@ -42,8 +42,12 @@ namespace QualityControl.WPF.Models
         [TsStatic]
         public static string Files_Get = "files.get";
         [TsStatic]
+        public static string Files_Delete = "files.delete";
+        [TsStatic]
         public static string Files_Upload = "files.upload";
         [TsStatic]
         public static string Files_Upload_Progress = "files.upload.progress";
+        [TsStatic]
+        public static int ImportFileMaxTimeoutSeconds = 180; // 3 minutes
     }
 }

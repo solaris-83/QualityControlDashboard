@@ -41,7 +41,7 @@ namespace QualityControl.WPF.Models
         public int? ElapsedTime { get; set; }
 
         [Name("App Version")]
-        public int? BCAVersion { get; set; }
+        public string? BCAVersion { get; set; }
 
         [Name("App Name")]
         public string? AppName { get; set; }
@@ -50,7 +50,7 @@ namespace QualityControl.WPF.Models
         public int WUVersion { get; set; }
 
         [Name("Error Code")]
-        public int? ErrorCode { get; set; }
+        public string? ErrorCode { get; set; }
 
         [Name("Error Description Ex")]
         public string? AdditionalInfo { get; set; }
@@ -67,15 +67,17 @@ namespace QualityControl.WPF.Models
             AutoMap(CultureInfo.InvariantCulture);
             
             // Configure nullable integer fields to treat empty strings as null
-            Map(m => m.ErrorCode).TypeConverterOption.NullValues(string.Empty, " ", "  ");
+           // Map(m => m.ErrorCode).TypeConverterOption.NullValues(string.Empty, " ", "  ");
             Map(m => m.WUVersion).TypeConverterOption.NullValues(string.Empty, " ", "  ");
             Map(m => m.ElapsedTime).TypeConverterOption.NullValues(string.Empty, " ", "  ");
-            Map(m => m.BCAVersion).TypeConverterOption.NullValues(string.Empty, " ", "  ");
-            
+          //  Map(m => m.BCAVersion).TypeConverterOption.NullValues(string.Empty, " ", "  ");
+
             // Configure nullable string fields
+            Map(m => m.ErrorCode).TypeConverterOption.NullValues(string.Empty, " ", "  ");
             Map(m => m.AppName).TypeConverterOption.NullValues(string.Empty, " ", "  ");
             Map(m => m.AdditionalInfo).TypeConverterOption.NullValues(string.Empty, " ", "  ");
             Map(m => m.AffectedControllers).TypeConverterOption.NullValues(string.Empty, " ", "  ");
+            Map(m => m.BCAVersion).TypeConverterOption.NullValues(string.Empty, " ", "  ");
         }
     }
 }

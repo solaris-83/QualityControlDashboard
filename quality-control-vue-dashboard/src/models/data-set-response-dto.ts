@@ -12,7 +12,7 @@ export class DataSetResponseDto {
     model: string = "";
     appName: string = "";
     resultType: string = "";
-    errorCode: number | null;
+    errorCode: string | null;
     elapsedTime: number | null;
     affectedControllers: string = "";
 }

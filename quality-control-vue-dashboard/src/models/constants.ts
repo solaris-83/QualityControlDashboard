@@ -6,6 +6,8 @@
 export class Constants {
     static dataset_Get: string = "datasets.get";
     static files_Get: string = "files.get";
+    static files_Delete: string = "files.delete";
     static files_Upload: string = "files.upload";
     static files_Upload_Progress: string = "files.upload.progress";
+    static importFileMaxTimeoutSeconds: number = 180;
 }

@@ -53,8 +53,8 @@ namespace QualityControl.WPF.DB.Models
         //[MaxLength(4)]
         public int? ElapsedTime { get; set; }
 
-       // [MaxLength(100)]
-        public int? BCAVersion { get; set; }
+        [MaxLength(100)]
+        public string? BCAVersion { get; set; }
 
         [MaxLength(100)]
         public string? AppName { get; set; }
@@ -62,8 +62,8 @@ namespace QualityControl.WPF.DB.Models
        // [MaxLength(100)]
         public int WUVersion { get; set; }
 
-       // [MaxLength(50)]
-        public int? ErrorCode { get; set; }
+        [MaxLength(50)]
+        public string? ErrorCode { get; set; }
 
         [MaxLength(500)]
         public string? AdditionalInfo { get; set; }
