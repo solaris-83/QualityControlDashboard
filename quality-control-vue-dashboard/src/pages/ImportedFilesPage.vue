@@ -89,7 +89,7 @@ async function importCsv() {
 
 async function deleteSelected() {
   await deleteImportedFiles(selectedFileIds.value);
-  loadFiles();
+  await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
 }
 </script>
 
