@@ -1,5 +1,4 @@
-import { ref, computed } from "vue";
-import { UserDto } from "../models/user-dto";
+import { ref } from "vue";
 import { bus } from "../services/webviewMessenger";
 import { FileRequestDto } from "../models/file-request-dto";
 import { logError, logSuccess, logInfo } from "../miscellanea/log";

@@ -66,8 +66,8 @@ const handleSelectedRowsUpdate = (selectedIds: number[]) => {
   console.log('Selected file IDs from table:', selectedIds);
 };
 
-onMounted(() => {
-  loadFiles();
+onMounted(async() => {
+  await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
 });
 
 async function loadFiles() {
@@ -84,7 +84,7 @@ async function importCsv() {
     .filter(Boolean);
 
   await uploadFile(request);
-  await loadFiles();
+  await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
 }
 
 async function deleteSelected() {
