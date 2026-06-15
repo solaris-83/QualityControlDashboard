@@ -6,7 +6,7 @@
 import { TypeEnum } from "./type-enum";
 
 export class WebMessageDto {
-    id: string = "55a979a6-9486-4f2c-abd7-a960c2aead2d";
+    id: string = "0db81b92-98c1-40d0-956c-fc4c4ae28b34";
     type: TypeEnum;
     payload: Object;
     name: string;

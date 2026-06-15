@@ -9,5 +9,6 @@ export class Constants {
     static files_Delete: string = "files.delete";
     static files_Upload: string = "files.upload";
     static files_Upload_Progress: string = "files.upload.progress";
+    static projects_Get: string = "projects.get";
     static importFileMaxTimeoutSeconds: number = 180;
 }
