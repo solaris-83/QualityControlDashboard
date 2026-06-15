@@ -5,6 +5,7 @@ using QualityControl.WPF.Messenger;
 using QualityControl.WPF.Services;
 using System.IO;
 using System.Windows;
+using Microsoft.Extensions.Logging;
 
 namespace QualityControl.WPF
 {

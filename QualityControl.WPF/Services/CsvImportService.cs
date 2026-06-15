@@ -563,13 +563,26 @@ namespace QualityControl.WPF.Services
 
                 if (existingFile != null)
                 {
-                    progress?.Report(new ImportProgressDto
+                    if (!string.IsNullOrEmpty(existingFile.ErrorMessage))
                     {
-                        FileName = fileName,
-                        CurrentRecord = 0,
-                        TotalRecords = 0,
-                        CurrentStatus = "Deleting rows of the previous import since a new file with the same name and different hash has been published...."
-                    });
+                        progress?.Report(new ImportProgressDto
+                        {
+                            FileName = fileName,
+                            CurrentRecord = 0,
+                            TotalRecords = 0,
+                            CurrentStatus = "Trying to import the same file that previously ran into error ..."
+                        });
+                    }
+                    else
+                    {
+                        progress?.Report(new ImportProgressDto
+                        {
+                            FileName = fileName,
+                            CurrentRecord = 0,
+                            TotalRecords = 0,
+                            CurrentStatus = "Deleting rows of the previous import since a new file with the same name and different hash has been published...."
+                        });
+                    }
                     // OPTIMIZATION: Delete in separate batch to avoid loading all rows into memory
                     await _context.DataSets
                         .Where(d => d.File_Id == existingFile.Id)
@@ -579,8 +592,6 @@ namespace QualityControl.WPF.Services
                     _context.Files.Remove(existingFile);
                     await _context.SaveChangesAsync(cancellationToken);
                 }
-
-                // TODO allow to reimport an already imported with error file
 
                 progress?.Report(new ImportProgressDto
                 {

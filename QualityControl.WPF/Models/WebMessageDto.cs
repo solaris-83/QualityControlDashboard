@@ -51,6 +51,8 @@ namespace QualityControl.WPF.Models
         [TsStatic]
         public static string Files_Upload_Progress = "files.upload.progress";
         [TsStatic]
+        public static string Projects_Get = "projects.get";
+        [TsStatic]
         public static int ImportFileMaxTimeoutSeconds = 180; // 3 minutes  // TODO Rimuovere per gestire il timeout lato server
     }
 }

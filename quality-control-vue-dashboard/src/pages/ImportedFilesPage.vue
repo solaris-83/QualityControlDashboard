@@ -7,7 +7,9 @@
 
     <div class="upload-panel">
       <h3>Import New CSV Batch</h3>
+      
       <div class="form-grid">
+
         <label>
           Week
           <input v-model.number="week" type="number" min="1" max="53" />
@@ -17,18 +19,23 @@
           Year
           <input v-model.number="year" type="number" min="2000" max="2100" />
         </label>
-
-        <label class="projects">
+        
+        <DropdownCheckbox
+          v-model="selectedProjects"
+          :options="projects"
+          placeholder="Choose Frameworks"
+        />
+        <!--<label class="projects">
           Projects (comma separated)
           <input v-model="projectsText" type="text" />
-        </label>
+        </label>-->
       </div>
 
       <div class="actions">
         <button type="button" :disabled="loading" @click="loadFiles">Load</button>
         <button type="button" :disabled="uploading" @click="importCsv">Import New CSV</button>
         <button type="button" :disabled="selectedFileIds.length === 0" @click="deleteSelected">Delete</button>
-        <button type="button" class="tertiary" :style="{ opacity: isStopEnabled ? 1 : 0.4 }" :disabled="!isStopEnabled" @click="handleStop">Stop</button>
+        <button v-if="false" type="button" class="tertiary" :style="{ opacity: isStopEnabled ? 1 : 0.4 }" :disabled="!isStopEnabled" @click="handleStop">Stop</button>
       </div>
     </div>
 
@@ -44,6 +51,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import FileResponseTable from '../components/FileResponseTable.vue';
+import DropdownCheckbox from '../components/DropDownCheckbox.vue';
 import { useImportFiles } from '../composables/useImportFiles.ts';
 import { FileRequestDto } from '../models/file-request-dto';
 import { getISOWeek } from 'date-fns';
@@ -57,8 +65,15 @@ const { uploadFile, loading, uploading, deleting, dataSetInfo, dataSetRows, data
 const now = new Date();
 const week = ref(getISOWeek(now));
 const year = ref(now.getFullYear());
-const projectsText = ref('BUS_ADAS,TRUCK_L24,TRUCK_MH24');
 const selectedFileIds = ref<number[]>([]);
+
+const projects = ref([
+  { id: 'BUS_ADAS', label: 'BUS_ADAS' },
+  { id: 'TRUCK_L24', label: 'TRUCK_L24' },
+  { id: 'TRUCK_MH24', label: 'TRUCK_MH24' },
+]);
+
+const selectedProjects = ref<string[]>(projects.value.map((project) => project.id));
 
 const handleSelectedRowsUpdate = (selectedIds: number[]) => {
   //isDeleteEnabled.value = selectedIds.length > 0;
@@ -80,11 +95,11 @@ const handleStop = () => {
 };
 
 onMounted(async() => {
-  await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
+  await loadImportedFiles(week.value, year.value, getSelectedProjects());
 });
 
 async function loadFiles() {
-  await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
+  await loadImportedFiles(week.value, year.value, getSelectedProjects());
 }
 
 const isStopEnabled = computed(() => uploading.value || loading.value || deleting.value);
@@ -93,18 +108,23 @@ async function importCsv() {
   const request = new FileRequestDto();
   request.week = week.value;
   request.year = year.value;
-  request.projects = projectsText.value
-    .split(',')
-    .map((project) => project.trim())
-    .filter(Boolean);
+  request.projects = getSelectedProjects();
 
   await uploadFile(request);
-  await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
+  await loadImportedFiles(week.value, year.value, getSelectedProjects());
 }
 
 async function deleteSelected() {
   await deleteImportedFiles(selectedFileIds.value);
-  await loadImportedFiles(week.value, year.value, projectsText.value.split(',').map((project) => project.trim()).filter(Boolean));
+  await loadImportedFiles(week.value, year.value, getSelectedProjects());
+}
+
+function getSelectedProjects(): string[] {
+  if (selectedProjects.value.length > 0) {
+    return selectedProjects.value;
+  }
+
+  return projects.value.map((project) => project.id);
 }
 </script>
 

@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Web.WebView2.Core;
 using QualityControl.WPF.DB;
 using QualityControl.WPF.Exceptions;
 using QualityControl.WPF.Messenger;
@@ -59,13 +60,20 @@ namespace QualityControl.WPF
             RegisterHandlers();
 
             // Navigate to the web application
-            Browser.Source = new Uri(@"http://localhost:5173");
-            
+#if DEBUG
+             Browser.Source = new Uri(@"http://localhost:5173");
+#elif RELEASE
             // Alternative: load from dist folder
-            // var distIndexPath = Path.GetFullPath(Path.Combine(
-            //     AppContext.BaseDirectory, "..", "..", "..", "..", 
-            //     "quality-control-vue-dashboard", "dist", "index.html"));
-            // Browser.Source = new Uri(distIndexPath);
+            var distIndexPath = Path.GetFullPath(Path.Combine(
+                AppContext.BaseDirectory, "..", "..", "..", "..",
+                "quality-control-vue-dashboard", "dist", "index.html"));
+
+            Browser.CoreWebView2.SetVirtualHostNameToFolderMapping(
+               "app.local",
+               Path.GetDirectoryName(distIndexPath),
+               CoreWebView2HostResourceAccessKind.Allow);
+            Browser.CoreWebView2.Navigate("https://app.local/index.html");
+#endif
         }
 
         private void RegisterHandlers()
@@ -103,7 +111,7 @@ namespace QualityControl.WPF
             });
 
             _messenger.RegisterHandler<List<int>, bool>(Constants.Files_Delete,
-                async request => // TODO gestire eccezione e rollback
+                async request =>
                 {
                     await using var transaction = await _context.Database.BeginTransactionAsync();
                     try
@@ -169,13 +177,13 @@ namespace QualityControl.WPF
 
             _messenger.RegisterHandler<FileRequestDto, List<ImportResultDto>>(
                 Constants.Files_Upload, 
-                async request => // TODO Mettere nel handler un pattern che se va in errore la lambda expression allora notifica a TS
+                async request =>
                 {
                     List<ImportResultDto> importResults = [];
                     try
                     {
                         using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(Constants.ImportFileMaxTimeoutSeconds)); // TODO gestire bene la cancellazione lato TS, altrimenti se il processo dura più di 30 secondi allora TS non riceve nulla e va in timeout
-                        ct.Token.ThrowIfCancellationRequested(); // TODO set catch exception
+                        ct.Token.ThrowIfCancellationRequested();
 
                         Progress<ImportProgressDto> progress = new(i =>
                         {
@@ -199,7 +207,7 @@ namespace QualityControl.WPF
                         foreach (var dir in dirs)
                         {
                             if (!Directory.Exists(dir.FullName))
-                                continue; // TODO magari notificare
+                                continue;
 
                             foreach (var file in dir.GetFiles().Where(f => request.Projects.Any(project => f.Name.Contains(project))))
                             {
@@ -210,7 +218,7 @@ namespace QualityControl.WPF
                                 }
                             }
                         }
-                        return importResults; // TODO non viene mappato errore c# verso il TS
+                        return importResults;
                     }
                     catch (DatabaseApplicationException)
                     {
@@ -223,6 +231,38 @@ namespace QualityControl.WPF
                     catch (Exception ex)
                     {
                         throw new ApplicationException($"Unexpected error during file import: {ex.Message}");
+                    }
+                });
+
+            _messenger.RegisterHandler<List<ProjectRequestDto>, List<ProjectResponseDto>>(Constants.Projects_Get,
+                async request =>
+                {
+                    if (request == null)
+                    {
+                        return [];
+                    }
+
+                    try
+                    {
+                        var query = _context.Projects.AsQueryable();
+                        if (request.Any(f => !string.IsNullOrEmpty(f.Name)))
+                        {
+                            foreach (var project in request)
+                            {
+                                if (!string.IsNullOrEmpty(project.Name))
+                                {
+                                    query = query.Where(p => p.Name.Contains(project.Name));
+                                }
+                            }
+                        }
+                        return await query.DistinctBy(p => p.Name).Select(p => new ProjectResponseDto
+                        {
+                            Name = p.Name
+                        }).ToListAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new DatabaseApplicationException(ex.Message);
                     }
                 });
         }
